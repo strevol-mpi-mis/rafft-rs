@@ -10,4 +10,3 @@
 
 - [] basically everything
 - [] license?
-- [] ordering of authors?
