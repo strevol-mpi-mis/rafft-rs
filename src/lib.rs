@@ -23,18 +23,10 @@ use pyo3::prelude::*;
 fn rafft(_py: Python, m: &PyModule) -> PyResult<()> {
     /// TODO documentation and API
     #[pyfn(m)]
-    fn fold(_py: Python, sequence: &str) -> PyResult<(f64, String)> {
+    fn fold(_py: Python, _sequence: &str) -> PyResult<(f64, String)> {
         unimplemented!()
         //Ok(crate_fold(s1, s2).unwrap())
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }
