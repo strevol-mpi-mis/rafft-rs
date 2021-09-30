@@ -1,8 +1,48 @@
 [package]
 name = "rafft-rs"
+# TODO: order? I write this implementation but all the conceptual work has been done by Vaitea and Nono
+authors = ["Vincent Messow <vincent.messow@mis.mpg.de>", "Vaitea Opuu <>", "Nono S. C. Merleau <>"]
+repository = "https://github.com/strevol-mpi-mis/dmc-rs"
+readme = "README.md"
+# TODO: licensing?
+license = "MIT"
+description = "RNA structure and folding dynamics prediction using fast Fourier transform."
+include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
+keywords = ["rna", "bioinformatics", "fft", "monte-carlo"]
+categories = ["science"]
 version = "0.1.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+librna-sys = { version = "0.1" }#, optional = true }
+ndarray = { version = "0.15", features = [] }
+pyo3 = { version = "0.14", features = ["extension-module", "abi3"], optional = true }
+rustfft = "6.0"
+structopt = "0.3"
+
+[dev-dependencies]
+
+[features]
+bindings = ["pyo3"]
+#rna = ["librna-sys"]
+
+[profile.release]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+
+# For PyO3 bindings
+[lib]
+name = "rafft"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "rafft"
+#required-features = ["rna"]
