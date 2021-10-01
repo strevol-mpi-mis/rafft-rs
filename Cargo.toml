@@ -19,7 +19,8 @@ edition = "2018"
 librna-sys = { version = "0.1" }#, optional = true }
 ndarray = { version = "0.15", features = [] }
 pyo3 = { version = "0.14", features = ["extension-module", "abi3"], optional = true }
-rustfft = "6.0"
+#rustfft = "6.0"
+realfft = "2.0"
 structopt = "0.3"
 thiserror = "1.0"
 
