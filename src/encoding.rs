@@ -79,8 +79,8 @@ impl Default for MirrorAlphabet {
 /// See the [module-level description](crate::encoding) for details.
 #[derive(Debug)]
 pub struct EncodedSequence {
-    forward: Array2<f64>,
-    mirrored: Array2<f64>,
+    pub(crate) forward: Array2<f64>,
+    pub(crate) mirrored: Array2<f64>,
 }
 
 impl EncodedSequence {
@@ -201,6 +201,10 @@ impl EncodedSequence {
             },
         )
     }
+
+    // TODO: method that returns an [EncodedSequence] built from a sub sequence
+    // or perform convolution/autocorrelation directly on slices by providing indices and lengths?
+    // I think in the latter case it might be better to store `mirrored` _not_ in reverse
 }
 
 #[cfg(test)]

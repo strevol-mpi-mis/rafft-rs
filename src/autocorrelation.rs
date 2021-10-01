@@ -1,9 +1,10 @@
 //! TODO: this extends the module encoding, so not sure if I need module-level documentation here
 
 use crate::encoding::EncodedSequence;
+use ndarray::Array1;
 use realfft::RealFftPlanner;
 
-fn convolution(a: &[f64], b: &[f64]) -> Vec<f64> {
+fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
     let length = a.len() + b.len() - 1;
 
     let mut planner = RealFftPlanner::<f64>::new();
@@ -39,13 +40,25 @@ fn convolution(a: &[f64], b: &[f64]) -> Vec<f64> {
 
     ifft.process(&mut in_ab, &mut out_ab).unwrap();
 
-    out_ab
+    Array1::from_vec(out_ab)
 }
 
 impl EncodedSequence {
-    /// TODO
-    pub fn autocorrelate(&self) -> bool {
-        unimplemented!()
+    /// TODO find a simpler way
+    pub fn autocorrelate(&self) -> Array1<f64> {
+        let correlates = self
+            .forward
+            .rows()
+            .into_iter()
+            .zip(self.mirrored.rows().into_iter())
+            .map(|(f, m)| convolution(f.as_slice().unwrap(), m.as_slice().unwrap()))
+            .collect::<Vec<_>>();
+
+        let shape = correlates[0].dim();
+
+        correlates
+            .iter()
+            .fold(Array1::zeros(shape), |acc, c| acc + c)
     }
 }
 
@@ -76,20 +89,20 @@ mod tests {
             1., 2., 2., 0., 1., 0., 1., 1., 0., 1., 0., 0., 0., 1., 1., 1.,
         ];*/
 
-        let ab_conv = convolution(&a, &bb)
-            .iter()
-            .map(|&f| f.round() as usize)
-            .collect::<Vec<_>>();
+        let mut ab_conv = convolution(&a, &bb);
+        ab_conv.mapv_inplace(|f| f.round());
 
-        let ab = vec![
-            0, 0, 0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 4, 3, 3, 1, 5, 5, 8, 4, 3, 3, 4, 6, 6, 6, 3, 6, 3,
-            8, 4, 4, 3, 5, 7, 6, 8, 3, 4, 7, 5, 11, 6, 6, 8, 6, 9, 8, 9, 7, 7, 7, 6, 7, 10, 10, 9,
-            11, 7, 10, 10, 10, 9, 13, 9, 8, 17, 10, 12, 20, 6, 16, 14, 14, 17, 13, 15, 9, 19, 9,
-            15, 13, 18, 13, 16, 11, 9, 14, 11, 16, 13, 11, 15, 13, 19, 10, 17, 7, 7, 14, 5, 9, 11,
-            11, 10, 19, 12, 8, 12, 6, 9, 8, 10, 10, 8, 12, 10, 12, 9, 10, 11, 7, 11, 7, 11, 6, 12,
-            9, 7, 12, 6, 10, 9, 8, 5, 6, 4, 5, 9, 4, 8, 6, 6, 9, 5, 7, 2, 3, 0, 2, 2, 4, 4, 5, 4,
-            2, 2, 0, 1, 2, 0, 2, 0,
-        ];
+        let ab = Array1::from_vec(vec![
+            0., 0., 0., 1., 2., 3., 2., 1., 0., 1., 2., 3., 4., 3., 3., 1., 5., 5., 8., 4., 3., 3.,
+            4., 6., 6., 6., 3., 6., 3., 8., 4., 4., 3., 5., 7., 6., 8., 3., 4., 7., 5., 11., 6.,
+            6., 8., 6., 9., 8., 9., 7., 7., 7., 6., 7., 10., 10., 9., 11., 7., 10., 10., 10., 9.,
+            13., 9., 8., 17., 10., 12., 20., 6., 16., 14., 14., 17., 13., 15., 9., 19., 9., 15.,
+            13., 18., 13., 16., 11., 9., 14., 11., 16., 13., 11., 15., 13., 19., 10., 17., 7., 7.,
+            14., 5., 9., 11., 11., 10., 19., 12., 8., 12., 6., 9., 8., 10., 10., 8., 12., 10., 12.,
+            9., 10., 11., 7., 11., 7., 11., 6., 12., 9., 7., 12., 6., 10., 9., 8., 5., 6., 4., 5.,
+            9., 4., 8., 6., 6., 9., 5., 7., 2., 3., 0., 2., 2., 4., 4., 5., 4., 2., 2., 0., 1., 2.,
+            0., 2., 0.,
+        ]);
 
         assert_eq!(ab, ab_conv);
     }
