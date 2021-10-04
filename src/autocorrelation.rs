@@ -44,8 +44,9 @@ fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
 }
 
 impl<'a> EncodedSequence<'a> {
-    /// TODO find a simpler way
-    pub fn autocorrelation(&self) -> Array1<f64> {
+    /// TODO find a simpler way?
+    /// explain `padding`
+    pub fn autocorrelation(&self, padding: f64) -> Array1<f64> {
         let correlates = self
             .forward
             .rows()
@@ -56,9 +57,18 @@ impl<'a> EncodedSequence<'a> {
 
         let shape = correlates[0].dim();
 
-        correlates
+        let norm = Array1::from_iter(
+            (0..(shape + 1) / 2)
+                .chain((0..(shape + 1) / 2 - 1).rev())
+                .map(|norm| norm as f64 + padding),
+        );
+
+        let mut correlates = correlates
             .iter()
-            .fold(Array1::zeros(shape), |acc, c| acc + c)
+            .fold(Array1::zeros(shape), |acc, c| acc + c);
+
+        correlates.zip_mut_with(&norm, |c, n| *c /= *n);
+        correlates
     }
 }
 
@@ -119,8 +129,9 @@ mod tests {
         };
         let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
 
-        let ac = encoded.autocorrelation();
+        let ac = encoded.autocorrelation(1.0);
 
-        println!("{}", ac);
+        //TODO finish test
+        assert!(false);
     }
 }
