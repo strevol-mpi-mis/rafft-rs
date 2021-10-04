@@ -43,7 +43,7 @@ fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
     Array1::from_vec(out_ab)
 }
 
-impl EncodedSequence {
+impl<'a> EncodedSequence<'a> {
     /// TODO find a simpler way
     pub fn autocorrelate(&self) -> Array1<f64> {
         let correlates = self

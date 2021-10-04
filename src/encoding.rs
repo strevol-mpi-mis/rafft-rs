@@ -17,7 +17,7 @@
 //!
 //! where `AU`, `GC`, `GU` are weights of the base pairs.
 
-use ndarray::{arr1, Array1, Array2, ArrayView, Axis};
+use ndarray::{arr1, s, Array1, Array2, ArrayView, Axis, CowArray, Ix2};
 use thiserror::Error;
 
 /// Error type representing errors that may arise during sequence parsing or encoding.
@@ -78,12 +78,12 @@ impl Default for MirrorAlphabet {
 /// An [EncodedSequence] consists of a _forward_ encoding and a _mirrored_ encoding.
 /// See the [module-level description](crate::encoding) for details.
 #[derive(Debug)]
-pub struct EncodedSequence {
-    pub(crate) forward: Array2<f64>,
-    pub(crate) mirrored: Array2<f64>,
+pub struct EncodedSequence<'a> {
+    pub(crate) forward: CowArray<'a, f64, Ix2>,
+    pub(crate) mirrored: CowArray<'a, f64, Ix2>,
 }
 
-impl EncodedSequence {
+impl<'a> EncodedSequence<'a> {
     /// Encode an RNA sequence with given [BasePairWeights] being stored in the mirrored encoded sequence.
     pub fn with_basepair_weights(sequence: &str, weights: &BasePairWeights) -> Result<Self, Error> {
         let mirrored_alphabet = MirrorAlphabet::new(weights);
@@ -184,8 +184,12 @@ impl EncodedSequence {
         }) {
             Err(e) => Err(e),
             _ => {
-                mirrored.invert_axis(Axis(1));
-                Ok(Self { forward, mirrored })
+                // I think I don't nee to reverse the encoded mirrored sequence because then I'd need to reverse again for autocorrelation::convolution()
+                //mirrored.invert_axis(Axis(1));
+                Ok(Self {
+                    forward: CowArray::from(forward),
+                    mirrored: CowArray::from(mirrored),
+                })
             }
         }
     }
@@ -200,6 +204,18 @@ impl EncodedSequence {
                 GU: 1.0,
             },
         )
+    }
+
+    /// Get an copy-on-write slice of a subsequence (0-indexed).
+    /// The range defined by `start` and `end` is inclusive.
+    pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
+        let sub_fwd = self.forward.slice(s![.., start..=end]);
+        let sub_mrrd = self.mirrored.slice(s![.., start..=end]);
+
+        Self {
+            forward: CowArray::from(sub_fwd),
+            mirrored: CowArray::from(sub_mrrd),
+        }
     }
 
     // TODO: method that returns an [EncodedSequence] built from a sub sequence
@@ -243,7 +259,7 @@ mod tests {
         .into_shape((4, 82))
         .unwrap();
 
-        let mrrd = Array::from_vec(vec![
+        /*let mrrd = Array::from_vec(vec![
             2., 0., 0., 0., 0., 2., 2., 2., 2., 0., 0., 0., 0., 0., 0., 0., 2., 0., 2., 0., 0., 2.,
             0., 2., 0., 0., 2., 0., 0., 2., 0., 0., 2., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
             0., 0., 2., 0., 0., 0., 0., 0., 0., 2., 2., 0., 2., 0., 0., 0., 0., 0., 0., 0., 0., 2.,
@@ -261,9 +277,50 @@ mod tests {
             2., 0., 1., 0., 1., 2., 2., 0., 1., 0., 1., 1., 0., 1., 0., 0., 0., 1., 1., 1.,
         ])
         .into_shape((4, 82))
+        .unwrap();*/
+        let mrrd = Array::from_vec(vec![
+            0., 0., 0., 2., 2., 2., 0., 0., 0., 0., 2., 0., 2., 0., 0., 0., 2., 0., 0., 0., 0., 0.,
+            0., 0., 0., 2., 0., 2., 2., 0., 0., 0., 0., 0., 0., 2., 0., 0., 0., 0., 0., 0., 0., 0.,
+            0., 0., 0., 0., 0., 2., 0., 0., 2., 0., 0., 2., 0., 0., 2., 0., 2., 0., 0., 2., 0., 2.,
+            0., 0., 0., 0., 0., 0., 0., 2., 2., 2., 2., 0., 0., 0., 0., 2., 3., 3., 3., 0., 0., 0.,
+            3., 0., 3., 3., 0., 3., 0., 0., 0., 3., 0., 3., 0., 0., 3., 0., 0., 0., 3., 0., 0., 0.,
+            0., 0., 0., 0., 0., 0., 3., 0., 3., 0., 3., 3., 0., 0., 0., 0., 3., 3., 0., 0., 0., 0.,
+            0., 3., 0., 0., 0., 0., 3., 0., 0., 3., 0., 0., 3., 0., 0., 0., 0., 0., 0., 3., 3., 3.,
+            0., 0., 0., 0., 0., 3., 0., 0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 3., 0., 0., 1., 0.,
+            1., 0., 0., 0., 1., 0., 3., 0., 0., 3., 3., 3., 0., 1., 3., 1., 1., 0., 3., 0., 3., 3.,
+            0., 1., 0., 3., 0., 0., 3., 0., 3., 0., 0., 0., 3., 0., 3., 1., 0., 0., 1., 0., 3., 1.,
+            0., 0., 1., 0., 1., 3., 0., 1., 0., 1., 0., 3., 0., 0., 0., 0., 3., 1., 1., 1., 1., 0.,
+            0., 3., 0., 1., 1., 1., 1., 0., 0., 0., 1., 0., 1., 1., 0., 1., 0., 2., 2., 1., 0., 1.,
+            0., 2., 1., 0., 0., 0., 1., 0., 0., 0., 0., 2., 0., 2., 0., 0., 1., 0., 1., 0., 1., 1.,
+            0., 2., 0., 2., 1., 1., 0., 2., 0., 0., 2., 1., 0., 2., 0., 0., 1., 2., 0., 1., 0., 0.,
+            1., 0., 2., 0., 2., 0., 2., 1., 1., 1., 0., 0., 0., 0., 0., 1., 2., 0., 2., 0.,
+        ])
+        .into_shape((4, 82))
         .unwrap();
 
-        assert_eq!(encoded.forward.to_string(), fwd.to_string());
-        assert_eq!(encoded.mirrored.to_string(), mrrd.to_string());
+        //assert_eq!(encoded.forward.to_string(), fwd.to_string());
+        //assert_eq!(encoded.mirrored.to_string(), mrrd.to_string());
+        assert_eq!(encoded.forward, fwd);
+        assert_eq!(encoded.mirrored, mrrd);
+    }
+
+    #[test]
+    fn test_subsequence() {
+        let sequence =
+            "GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU";
+        let bpw = BasePairWeights {
+            AU: 2.0,
+            GC: 3.0,
+            GU: 1.0,
+        };
+        let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
+
+        let sub = encoded.subsequence(0, 5);
+
+        // TODO: These assertions are rather implementation-specific.
+        assert!(sub.forward.is_view());
+        assert!(sub.mirrored.is_view());
+        assert_eq!(sub.forward, CowArray::from(encoded.forward.slice(s![..,0..=5])));
+        assert_eq!(sub.mirrored, CowArray::from(encoded.mirrored.slice(s![..,0..=5])));
     }
 }
