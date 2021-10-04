@@ -45,7 +45,7 @@ fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
 
 impl<'a> EncodedSequence<'a> {
     /// TODO find a simpler way
-    pub fn autocorrelate(&self) -> Array1<f64> {
+    pub fn autocorrelation(&self) -> Array1<f64> {
         let correlates = self
             .forward
             .rows()
@@ -65,6 +65,7 @@ impl<'a> EncodedSequence<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding::*;
 
     #[test]
     fn test_convolution() {
@@ -105,5 +106,21 @@ mod tests {
         ]);
 
         assert_eq!(ab, ab_conv);
+    }
+
+    #[test]
+    fn test_autocorrelation() {
+        let sequence =
+            "GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU";
+        let bpw = BasePairWeights {
+            AU: 2.0,
+            GC: 3.0,
+            GU: 1.0,
+        };
+        let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
+
+        let ac = encoded.autocorrelation();
+
+        println!("{}", ac);
     }
 }
