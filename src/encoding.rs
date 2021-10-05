@@ -17,7 +17,7 @@
 //!
 //! where `AU`, `GC`, `GU` are weights of the base pairs.
 
-use ndarray::{arr1, s, Array1, Array2, CowArray, Ix2};
+use ndarray::{arr1, s, Array1, Array2, Axis, CowArray, Ix2};
 use thiserror::Error;
 
 /// Error type representing errors that may arise during sequence parsing or encoding.
@@ -162,14 +162,37 @@ impl<'a> EncodedSequence<'a> {
     }
 
     /// Get an copy-on-write slice of a subsequence (0-indexed).
-    /// The range defined by `start` and `end` is inclusive.
+    /// The range defined by `start` and `end` is exclusive.
+    /// If `start >= end`, a contiguous EncodedSequence is newly created, with `end` as `5'` and `start-1` as `3'`.
     pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
-        let sub_fwd = self.forward.slice(s![.., start..=end]);
-        let sub_mrrd = self.mirrored.slice(s![.., start..=end]);
+        if start < end {
+            let sub_fwd = self.forward.slice(s![.., start..end]);
+            let sub_mrrd = self.mirrored.slice(s![.., start..end]);
 
-        Self {
-            forward: CowArray::from(sub_fwd),
-            mirrored: CowArray::from(sub_mrrd),
+            Self {
+                forward: CowArray::from(sub_fwd),
+                mirrored: CowArray::from(sub_mrrd),
+            }
+        } else {
+            let indices: Vec<usize> = (start..self.forward.len_of(Axis(1)))
+                .chain(0..end)
+                .collect();
+
+            // double-select to force C standard layout
+            // this is hacky and not as efficient as possible but should suffice for now
+            let sub_fwd = self
+                .forward
+                .select(Axis(1), &indices)
+                .select(Axis(0), &[0, 1, 2, 3]);
+            let sub_mrrd = self
+                .mirrored
+                .select(Axis(1), &indices)
+                .select(Axis(0), &[0, 1, 2, 3]);
+
+            Self {
+                forward: CowArray::from(sub_fwd),
+                mirrored: CowArray::from(sub_mrrd),
+            }
         }
     }
 
@@ -275,11 +298,18 @@ mod tests {
         assert!(sub.mirrored.is_view());
         assert_eq!(
             sub.forward,
-            CowArray::from(encoded.forward.slice(s![.., 0..=5]))
+            CowArray::from(encoded.forward.slice(s![.., 0..5]))
         );
         assert_eq!(
             sub.mirrored,
-            CowArray::from(encoded.mirrored.slice(s![.., 0..=5]))
+            CowArray::from(encoded.mirrored.slice(s![.., 0..5]))
         );
+
+        let oligo = "AUGGG";
+        let encoded_oligo = EncodedSequence::with_basepair_weights(oligo, &bpw).unwrap();
+        let concat_oligo = encoded.subsequence(80, 3);
+
+        assert_eq!(concat_oligo.forward, encoded_oligo.forward);
+        assert_eq!(concat_oligo.mirrored, encoded_oligo.mirrored);
     }
 }

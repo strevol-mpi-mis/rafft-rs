@@ -77,6 +77,6 @@ mod tests {
             0, 0, 0, 27, 26, 25, 0, 0,
         ]);
 
-        assert_eq!(-25.8, vc.evaluate_structure(pt.view()));
+        assert_eq!(-25.8f64, vc.evaluate_structure(pt.view()));
     }
 }
