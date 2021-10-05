@@ -11,8 +11,9 @@ pub mod autocorrelation;
 #[allow(dead_code)]
 pub mod encoding;
 //#[cfg(feature = "rna")]
-//#[allow(dead_code)]
-//pub mod optionalmodule;
+/// Purpose-specific bindings for ViennaRNA
+#[allow(dead_code)]
+mod vienna;
 
 #[cfg(feature = "bindings")]
 use pyo3::prelude::*;
