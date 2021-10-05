@@ -10,6 +10,9 @@ pub mod autocorrelation;
 /// Encoding of RNA sequences using nucleotide representations suitable for FFT
 #[allow(dead_code)]
 pub mod encoding;
+/// Implementation of the RAFFT fast-folding algorithm.
+#[allow(dead_code)]
+pub mod fast_folding;
 //#[cfg(feature = "rna")]
 /// Purpose-specific bindings for ViennaRNA
 #[allow(dead_code)]
