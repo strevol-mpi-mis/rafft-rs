@@ -1,11 +1,13 @@
 use librna_sys::{
     vrna_alloc, vrna_db_from_ptable, vrna_eval_structure_pt, vrna_fold_compound,
-    vrna_fold_compound_free, vrna_fold_compound_t, vrna_md_set_default, vrna_md_t,
-    VRNA_OPTION_EVAL_ONLY,
+    vrna_fold_compound_free, vrna_fold_compound_t, vrna_md_defaults_temperature,
+    vrna_md_set_default, vrna_md_t, vrna_params_load, VRNA_OPTION_EVAL_ONLY,
+    VRNA_PARAMETER_FORMAT_DEFAULT,
 };
 use ndarray::ArrayView1;
 use std::convert::TryInto;
 use std::ffi::CString;
+use std::path::PathBuf;
 
 pub struct VCompound {
     fc: *mut vrna_fold_compound_t,
@@ -53,6 +55,20 @@ impl Drop for VCompound {
         unsafe {
             vrna_fold_compound_free(self.fc);
         }
+    }
+}
+
+pub fn set_global_temperature(temperature: f64) {
+    unsafe {
+        vrna_md_defaults_temperature(temperature);
+    }
+}
+
+pub fn set_global_energy_parameters(parameters: PathBuf) {
+    unsafe {
+        let cparams =
+            std::ffi::CString::new(parameters.to_str().unwrap()).expect("CString::new failed");
+        vrna_params_load(cparams.as_ptr(), VRNA_PARAMETER_FORMAT_DEFAULT);
     }
 }
 

@@ -1,5 +1,7 @@
 //! TODO: Brief description of RAFFT and data structures
 //! TODO: documentation
+//! TODO: Sanity checks on associated methods in impl RafftConfig
+//! Note that energy parameters and temperature are set globally (available via CLI, crate root and python bindings)
 
 use crate::autocorrelation::*;
 use crate::encoding::{BasePairWeights, EncodedSequence};
@@ -7,7 +9,6 @@ use crate::vienna::VCompound;
 
 pub struct RafftConfig {
     basepair_weights: BasePairWeights,
-    temperature: f64,
     min_unpaired: usize,
     min_loop_energy: f64,
     number_of_lags: usize,
@@ -24,7 +25,6 @@ impl Default for RafftConfig {
                 GC: 3.0,
                 GU: 1.0,
             },
-            temperature: 37.0,
             min_unpaired: 3,
             min_loop_energy: 0.0,
             number_of_lags: 100,
@@ -46,11 +46,6 @@ impl RafftConfig {
             GC: gc,
             GU: gu,
         };
-        self
-    }
-
-    pub fn temperature(&mut self, temperature: f64) -> &mut Self {
-        self.temperature = temperature;
         self
     }
 

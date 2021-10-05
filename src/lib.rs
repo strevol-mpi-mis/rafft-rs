@@ -18,6 +18,8 @@ pub mod fast_folding;
 #[allow(dead_code)]
 mod vienna;
 
+pub use vienna::{set_global_energy_parameters, set_global_temperature};
+
 #[cfg(feature = "bindings")]
 use pyo3::prelude::*;
 
@@ -26,6 +28,18 @@ use pyo3::prelude::*;
 #[pymodule]
 fn rafft(_py: Python, m: &PyModule) -> PyResult<()> {
     /// TODO documentation and API
+    #[pyfn(m)]
+    fn set_temperature(_py: Python, temperature: f64) -> PyResult<()> {
+        set_global_temperature(temperature);
+        Ok(())
+    }
+
+    #[pyfn(m)]
+    fn set_energy_parameters(_py: Python, _parameters: &str) -> PyResult<()> {
+        set_global_energy_parameters(std::path::PathBuf::from(_parameters));
+        Ok(())
+    }
+
     #[pyfn(m)]
     fn fold(_py: Python, _sequence: &str) -> PyResult<(f64, String)> {
         unimplemented!()
