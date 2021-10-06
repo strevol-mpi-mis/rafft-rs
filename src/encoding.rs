@@ -139,14 +139,10 @@ impl<'a> EncodedSequence<'a> {
             _ => Err(Error::InvalidNucleotide(c)),
         }) {
             Err(e) => Err(e),
-            _ => {
-                // I think I don't need to reverse the encoded mirrored sequence because then I'd need to reverse again for autocorrelation::convolution()
-                //mirrored.invert_axis(Axis(1));
-                Ok(Self {
-                    forward: CowArray::from(forward),
-                    mirrored: CowArray::from(mirrored),
-                })
-            }
+            _ => Ok(Self {
+                forward: CowArray::from(forward),
+                mirrored: CowArray::from(mirrored),
+            }),
         }
     }
 

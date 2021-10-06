@@ -75,6 +75,11 @@ impl RafftConfig {
     }
 
     pub fn fold(&mut self, sequence: &str) -> (f64, String) {
+        let fc = VCompound::new(sequence);
+
+        let encoded = EncodedSequence::with_basepair_weights(sequence, &self.basepair_weights)
+            .expect("Not a valid RNA Sequence!");
+
         todo!()
     }
 
@@ -85,3 +90,7 @@ impl RafftConfig {
         todo!()
     }
 }
+
+/*impl<'a> EncodedSequence<'a> {
+    pub fn slide_window
+}*/

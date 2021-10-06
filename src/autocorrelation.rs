@@ -55,7 +55,14 @@ impl<'a> EncodedSequence<'a> {
             .rows()
             .into_iter()
             .zip(self.mirrored.rows().into_iter())
-            .map(|(f, m)| convolution(f.as_slice().unwrap(), m.as_slice().unwrap()))
+            .map(|(f, m)| {
+                // if I'd reverse, this would cause an extra allocation
+                //let mut m_reversed = m.as_slice().unwrap().to_vec();
+                //m_reversed.reverse();
+                //convolution(f.as_slice().unwrap(), &m_reversed)
+                // So far, I don't see any reason to store EncodedSequence.mirrored in reverse.
+                convolution(f.as_slice().unwrap(), m.as_slice().unwrap())
+            })
             .collect::<Vec<_>>();
 
         let shape = correlates[0].dim();
