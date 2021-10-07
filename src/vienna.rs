@@ -69,9 +69,9 @@ pub fn set_global_temperature(temperature: f64) {
 /// Reads the parameters of the Nearest-Neighbor model from a file and sets them globally.
 /// Refer to the [upstream API](https://www.tbi.univie.ac.at/RNA/ViennaRNA/doc/html/group__energy__parameters__rw.html#gabb0583595c67094986ef90cb4f1c7555) for details.
 pub fn set_global_energy_parameters(parameters: PathBuf) {
+    let cparams =
+        std::ffi::CString::new(parameters.to_str().unwrap()).expect("CString::new failed");
     unsafe {
-        let cparams =
-            std::ffi::CString::new(parameters.to_str().unwrap()).expect("CString::new failed");
         vrna_params_load(cparams.as_ptr(), VRNA_PARAMETER_FORMAT_DEFAULT);
     }
 }
