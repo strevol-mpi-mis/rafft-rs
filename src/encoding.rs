@@ -77,7 +77,7 @@ impl Default for MirrorAlphabet {
     }
 }
 
-/// An [EncodedSequence] consists of a _forward_ encoding and a _mirrored_ encoding.
+/// An [`EncodedSequence`] consists of a _forward_ encoding and a _mirrored_ encoding.
 /// See the [module-level description](crate::encoding) for details.
 #[derive(Debug)]
 pub struct EncodedSequence<'a> {
@@ -86,7 +86,7 @@ pub struct EncodedSequence<'a> {
 }
 
 impl<'a> EncodedSequence<'a> {
-    /// Encode an RNA sequence with given [BasePairWeights] being stored in the mirrored encoded sequence.
+    /// Encode an RNA sequence with given [`BasePairWeights`] being stored in the mirrored encoded sequence.
     pub fn with_basepair_weights(sequence: &str, weights: &BasePairWeights) -> Result<Self, Error> {
         let mirrored_alphabet = MirrorAlphabet::new(weights);
 
@@ -146,7 +146,7 @@ impl<'a> EncodedSequence<'a> {
         }
     }
 
-    /// Encode an RNA sequence with equal [BasePairWeights].
+    /// Encode an RNA sequence with equal [`BasePairWeights`].
     pub fn new(sequence: &str) -> Result<Self, Error> {
         Self::with_basepair_weights(
             sequence,
@@ -156,6 +156,11 @@ impl<'a> EncodedSequence<'a> {
                 GU: 1.0,
             },
         )
+    }
+
+    /// Returns the length of the encoded sequence.
+    pub fn len(&self) -> usize {
+        self.forward.len_of(Axis(1))
     }
 
     /// Get an copy-on-write slice of a subsequence (0-indexed).
@@ -171,9 +176,7 @@ impl<'a> EncodedSequence<'a> {
                 mirrored: CowArray::from(sub_mrrd),
             }
         } else {
-            let indices: Vec<usize> = (start..self.forward.len_of(Axis(1)))
-                .chain(0..end)
-                .collect();
+            let indices: Vec<usize> = (start..self.len()).chain(0..end).collect();
 
             // double-select to force C standard layout
             // this is hacky and not as efficient as possible but should suffice for now
@@ -192,10 +195,70 @@ impl<'a> EncodedSequence<'a> {
             }
         }
     }
+}
 
-    // TODO: method that returns an [EncodedSequence] built from a sub sequence
-    // or perform convolution/autocorrelation directly on slices by providing indices and lengths?
-    // I think in the latter case it might be better to store `mirrored` _not_ in reverse
+/// A wrapper type for pair tables in `ViennaRNA`.
+/// This struct stores `i16` internally and is `1`-indexed.
+///
+/// Refer to the [upstream API](https://www.tbi.univie.ac.at/RNA/ViennaRNA/doc/html/group__struct__utils__pair__table.html) for details.
+pub struct PairTable(Array1<i16>);
+
+impl PairTable {
+    /// Creates a new [`PairTable`].
+    pub fn new(length: usize) -> Self {
+        let mut inner = Array1::zeros(length + 1);
+        inner[0] = length.try_into().unwrap();
+        PairTable(inner)
+    }
+
+    /// Returns the `length` of the represented structure.
+    /// The internal representation has `length + 1` elements for compatibility with ViennaRNA.
+    pub fn len(&self) -> usize {
+        self.0[0] as usize
+    }
+
+    /// Returns `true` if the represented structure is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns an iterator over all unpaired positions (`1`-indexed).
+    pub fn unpaired(&self) -> impl Iterator<Item = usize> + '_ {
+        self.0
+            .indexed_iter()
+            .filter(|(_, &u)| u == 0)
+            .map(|(i, _)| i as usize)
+    }
+
+    /// Returns an iterater over all ordered tuples of paired positions (`1-indexed`).
+    pub fn paired(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.0
+            .indexed_iter()
+            .skip(1)
+            .filter(|(i, &u)| i < &(u as usize))
+            .map(|(i, &u)| (i, u as usize))
+    }
+
+    /// Inserts a new pair into the [`PairTable`].
+    /// Does not check for crossing pairs.
+    /// Panics if supplied positions are out of range or already paired.
+    pub fn insert(&mut self, i: i16, j: i16) {
+        assert!(0 < i && i <= self.len().try_into().unwrap());
+        assert!(0 < j && j <= self.len().try_into().unwrap());
+
+        assert_ne!(i, j);
+
+        assert_eq!(self.0[i as usize], 0);
+        assert_eq!(self.0[j as usize], 0);
+
+        self.0[i as usize] = j;
+        self.0[j as usize] = i;
+    }
+
+    /// Returns a view of the inner array.
+    pub fn view(&self) -> ArrayView1<i16> {
+        self.0.view()
+    }
 }
 
 #[cfg(test)]
@@ -308,56 +371,5 @@ mod tests {
 
         assert_eq!(concat_oligo.forward, encoded_oligo.forward);
         assert_eq!(concat_oligo.mirrored, encoded_oligo.mirrored);
-    }
-}
-///TODO: document 1-indexed
-/// i16 for viennarna
-pub struct PairTable(Array1<i16>);
-
-impl PairTable {
-    pub fn new(length: usize) -> Self {
-        let mut inner = Array1::zeros(length + 1);
-        inner[0] = length.try_into().unwrap();
-        PairTable(inner)
-    }
-    /// TODO: rather return number of pairs?
-    pub fn len(&self) -> usize {
-        self.0[0] as usize
-    }
-    /// TODO: rather return if no pairs present?
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-    /// TODO: 1-indexed
-    pub fn unpaired(&self) -> impl Iterator<Item = usize> + '_ {
-        self.0
-            .indexed_iter()
-            .filter(|(_, &u)| u == 0)
-            .map(|(i, _)| i as usize)
-    }
-
-    pub fn paired(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.0
-            .indexed_iter()
-            .skip(1)
-            .filter(|(i, &u)| i < &(u as usize))
-            .map(|(i, &u)| (i, u as usize))
-    }
-
-    pub fn insert(&mut self, i: i16, j: i16) {
-        assert!(0 < i && i <= self.len().try_into().unwrap());
-        assert!(0 < j && j <= self.len().try_into().unwrap());
-
-        assert_ne!(i, j);
-
-        assert_eq!(self.0[i as usize], 0);
-        assert_eq!(self.0[j as usize], 0);
-
-        self.0[i as usize] = j;
-        self.0[j as usize] = i;
-    }
-
-    pub fn view(&self) -> ArrayView1<i16> {
-        self.0.view()
     }
 }

@@ -6,6 +6,7 @@
 use crate::autocorrelation::*;
 use crate::encoding::{BasePairWeights, EncodedSequence};
 use crate::vienna::VCompound;
+use ndarray::s;
 
 pub struct RafftConfig {
     basepair_weights: BasePairWeights,
@@ -91,6 +92,29 @@ impl RafftConfig {
     }
 }
 
-/*impl<'a> EncodedSequence<'a> {
-    pub fn slide_window
-}*/
+impl<'a> EncodedSequence<'a> {
+    /// Search for the longest sequence of consecutive pairs of the encoded sequence and its (reversed) mirror
+    /// offset-aligned by `positional_lag` using a sliding-window approach.
+    ///
+    /// Returns a quadruple containing the number of pairs in the sequence,
+    /// the first and last position of that sequence, and a score based on the underlying [`BasePairWeights`]
+    pub fn consecutive_pairs_at_lag(&self, positional_lag: usize) -> (usize, usize, usize, usize) {
+        // Slicing this way since self.mirrored is stored in the same direction as self.forward
+        // Maybe this would be simpler using `%`?
+        let (fwd_sliceinfo, mrrd_sliceinfo) = if positional_lag < self.len() {
+            (s![.., ..=positional_lag], s![.., ..=positional_lag;-1])
+        } else {
+            (
+                s![.., self.len() - positional_lag + 1..],
+                s![.., self.len()-positional_lag+1..;-1],
+            )
+        };
+
+        let fwd_slice = self.forward.slice(fwd_sliceinfo);
+        let mrrd_slice = self.mirrored.slice(mrrd_sliceinfo);
+
+        // window only needs to slide over half of the offset-aligned sequences
+        // I don't think I need pos_list to check for conti
+        todo!()
+    }
+}
