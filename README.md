@@ -1,11 +1,13 @@
 # `rafft-rs`
 
+Rust implementation of [RAFFT](https://github.com/strevol-mpi-mis/RAFFT), an algorithm for [*efficient prediction of RNA folding pathways using the fast Fourier transform*](https://doi.org/10.1101/2021.07.02.450908).
+
 ## Prerequisites
 
 - [`Rust`](https://rustup.rs/)
 - [`ViennaRNA`](https://www.tbi.univie.ac.at/RNA/#download) including C header files
 
-If `ViennaRNA` is installed in a non-default location, e.g. [`bioconda`](https://bioconda.github.io/user/install.html),
+If `ViennaRNA` is installed in a non-default location, e.g. by using [`bioconda`](https://bioconda.github.io/user/install.html),
 it might be necessary to set some [environment variables](https://crates.io/crates/librna-sys) before building:
 
 ```sh
@@ -14,11 +16,11 @@ export LIBRNA_LIB_DIR=~/bin/miniconda3/envs/yourenv/lib/ # adjust as necessary
 export CPATH=$LIBRNA_INCLUDE_DIR
 ```
 
-Alternatively, append `--features librna-sys/auto` to invocations of `cargo` if `ViennaRNA` is detectable via `pkg-config`.
+Alternatively, append `--features librna-sys/auto` to invocations of `cargo` if `pkg-config --exists RNAlib2` returns successfully.
 
 ## Building
 
-_Note: Both CLI and bindings are not yet working!_
+**Note: Both CLI and bindings are not yet usable!**
 
 To build the main CLI executable `rufft`, run
 

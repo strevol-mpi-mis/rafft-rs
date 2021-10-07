@@ -83,6 +83,7 @@ impl Default for MirrorAlphabet {
 pub struct EncodedSequence<'a> {
     pub(crate) forward: CowArray<'a, f64, Ix2>,
     pub(crate) mirrored: CowArray<'a, f64, Ix2>,
+    concatenation_site: Option<usize>,
 }
 
 impl<'a> EncodedSequence<'a> {
@@ -142,6 +143,7 @@ impl<'a> EncodedSequence<'a> {
             _ => Ok(Self {
                 forward: CowArray::from(forward),
                 mirrored: CowArray::from(mirrored),
+                concatenation_site: None,
             }),
         }
     }
@@ -158,14 +160,31 @@ impl<'a> EncodedSequence<'a> {
         )
     }
 
-    /// Returns the length of the encoded sequence.
+    /// Return the length of the encoded sequence.
     pub fn len(&self) -> usize {
         self.forward.len_of(Axis(1))
     }
 
+    /// Return whether the encoded sequence is empty.
+    pub fn is_empty(&self) -> bool {
+        self.forward.is_empty()
+    }
+
+    /// Return the position of concatenation if `&self` was created
+    /// using [`subsequence()`] from two non-contiguous fragments and `None` otherwise.
+    pub fn concatenation_site(&self) -> Option<usize> {
+        self.concatenation_site
+    }
+
+    /// Return `true` if `&self` represents a sequence concatenated from two fragments
+    /// using [`subsequence()`] and `false` otherwise.
+    pub fn is_concatenated(&self) -> bool {
+        self.concatenation_site.is_some()
+    }
+
     /// Get an copy-on-write slice of a subsequence (0-indexed).
     /// The range defined by `start` and `end` is exclusive.
-    /// If `start >= end`, a contiguous EncodedSequence is newly created, with `end` as `5'` and `start-1` as `3'`.
+    /// If `start >= end`, a contiguous [`EncodedSequence`] is newly created, with `start` as `5'` and `end-1` as `3'`.
     pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
         if start < end {
             let sub_fwd = self.forward.slice(s![.., start..end]);
@@ -174,6 +193,7 @@ impl<'a> EncodedSequence<'a> {
             Self {
                 forward: CowArray::from(sub_fwd),
                 mirrored: CowArray::from(sub_mrrd),
+                concatenation_site: None,
             }
         } else {
             let indices: Vec<usize> = (start..self.len()).chain(0..end).collect();
@@ -192,6 +212,7 @@ impl<'a> EncodedSequence<'a> {
             Self {
                 forward: CowArray::from(sub_fwd),
                 mirrored: CowArray::from(sub_mrrd),
+                concatenation_site: Some(start),
             }
         }
     }
@@ -202,7 +223,7 @@ impl<'a> EncodedSequence<'a> {
     /// offset-aligned by `positional_lag` using a sliding-window approach.
     ///
     /// Returns a quadruple containing the number of pairs in the sequence,
-    /// the first and last position of that sequence, and a score based on the underlying [`BasePairWeights`]
+    /// the first paired positions of both strands, and a score based on the underlying [`BasePairWeights`]
     pub fn consecutive_pairs_at_lag(&self, positional_lag: usize) -> (usize, usize, usize, usize) {
         // Slicing this way since self.mirrored is stored in the same direction as self.forward
         // Maybe this would be simpler using `%`?
@@ -210,17 +231,28 @@ impl<'a> EncodedSequence<'a> {
             (s![.., ..=positional_lag], s![.., ..=positional_lag;-1])
         } else {
             (
-                s![.., self.len() - positional_lag + 1..],
-                s![.., self.len()-positional_lag+1..;-1],
+                s![.., self.len() - positional_lag..],
+                s![.., self.len() - positional_lag..;-1],
             )
         };
 
         let fwd_slice = self.forward.slice(fwd_sliceinfo);
         let mrrd_slice = self.mirrored.slice(mrrd_sliceinfo);
 
-        // window only needs to slide over half of the offset-aligned sequences
-        // I don't think I need pos_list to check for conti
-        todo!()
+        // Slide over half of the offset-aligned sequences since they are complementary
+        let halved_length = fwd_slice.len_of(Axis(1)) / 2 + fwd_slice.len_of(Axis(1)) % 2;
+
+        // The total pairing score per position is computed as the pairwise product
+        // of the offset-aligned sequences (actually, only their first halves)
+        // and then summed over all four nucleotides.
+        let total_pairing_scores = (fwd_slice.slice(s![.., ..halved_length]).to_owned()
+            * mrrd_slice.slice(s![.., ..halved_length]))
+        .sum_axis(Axis(0));
+
+        println!("{}", total_pairing_scores);
+        // I don't think I need sth. like pos_list to check for contiguity? Or do I?
+        // Maybe `EncodedSequence` needs a field storing the cutting site if subsequence() glued two outer fragments?
+        (0, 0, 0, 0)
     }
 }
 
@@ -231,25 +263,25 @@ impl<'a> EncodedSequence<'a> {
 pub struct PairTable(Array1<i16>);
 
 impl PairTable {
-    /// Creates a new [`PairTable`].
+    /// Create a new [`PairTable`].
     pub fn new(length: usize) -> Self {
         let mut inner = Array1::zeros(length + 1);
         inner[0] = length.try_into().unwrap();
         PairTable(inner)
     }
 
-    /// Returns the `length` of the represented structure.
+    /// Return the `length` of the represented structure.
     /// The internal representation has `length + 1` elements for compatibility with ViennaRNA.
     pub fn len(&self) -> usize {
         self.0[0] as usize
     }
 
-    /// Returns `true` if the represented structure is empty.
+    /// Return whether the represented structure is empty.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Returns an iterator over all unpaired positions (`1`-indexed).
+    /// Return an iterator over all unpaired positions (`1`-indexed).
     pub fn unpaired(&self) -> impl Iterator<Item = usize> + '_ {
         self.0
             .indexed_iter()
@@ -257,7 +289,7 @@ impl PairTable {
             .map(|(i, _)| i as usize)
     }
 
-    /// Returns an iterater over all ordered tuples of paired positions (`1-indexed`).
+    /// Return an iterater over all ordered tuples of paired positions (`1-indexed`).
     pub fn paired(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         self.0
             .indexed_iter()
@@ -266,7 +298,7 @@ impl PairTable {
             .map(|(i, &u)| (i, u as usize))
     }
 
-    /// Inserts a new pair into the [`PairTable`].
+    /// Insert a new pair into the [`PairTable`].
     /// Does not check for crossing pairs.
     /// Panics if supplied positions are out of range or already paired.
     pub fn insert(&mut self, i: i16, j: i16) {
@@ -282,7 +314,7 @@ impl PairTable {
         self.0[j as usize] = i;
     }
 
-    /// Returns a view of the inner array.
+    /// Return a view of the inner array.
     pub fn view(&self) -> ArrayView1<i16> {
         self.0.view()
     }
@@ -398,5 +430,20 @@ mod tests {
 
         assert_eq!(concat_oligo.forward, encoded_oligo.forward);
         assert_eq!(concat_oligo.mirrored, encoded_oligo.mirrored);
+    }
+
+    #[test]
+    fn test_consecutivepairs() {
+        let sequence = "GUGUAAG";
+        let bpw = BasePairWeights {
+            AU: 2.0,
+            GC: 3.0,
+            GU: 1.0,
+        };
+        let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
+
+        encoded.consecutive_pairs_at_lag(4);
+        encoded.consecutive_pairs_at_lag(10);
+        encoded.consecutive_pairs_at_lag(5);
     }
 }
