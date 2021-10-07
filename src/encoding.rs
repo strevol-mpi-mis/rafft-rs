@@ -231,13 +231,19 @@ impl<'a> EncodedSequence<'a> {
             (s![.., ..=positional_lag], s![.., ..=positional_lag;-1])
         } else {
             (
-                s![.., self.len() - positional_lag..],
-                s![.., self.len() - positional_lag..;-1],
+                s![.., positional_lag - self.len() + 1..],
+                s![.., positional_lag - self.len() + 1..;-1],
             )
         };
 
+        println!("{}", self.forward);
+        println!("{}", self.mirrored);
+
         let fwd_slice = self.forward.slice(fwd_sliceinfo);
         let mrrd_slice = self.mirrored.slice(mrrd_sliceinfo);
+
+        println!("{}", fwd_slice);
+        println!("{}", mrrd_slice);
 
         // Slide over half of the offset-aligned sequences since they are complementary
         let halved_length = fwd_slice.len_of(Axis(1)) / 2 + fwd_slice.len_of(Axis(1)) % 2;
@@ -245,13 +251,21 @@ impl<'a> EncodedSequence<'a> {
         // The total pairing score per position is computed as the pairwise product
         // of the offset-aligned sequences (actually, only their first halves)
         // and then summed over all four nucleotides.
-        let total_pairing_scores = (fwd_slice.slice(s![.., ..halved_length]).to_owned()
+        let mut total_pairing_scores = (fwd_slice.slice(s![.., ..halved_length]).to_owned()
             * mrrd_slice.slice(s![.., ..halved_length]))
         .sum_axis(Axis(0));
 
         println!("{}", total_pairing_scores);
+
+        // accumulate scores to find longest consecutive chains of paired positions
+        total_pairing_scores.accumulate_axis_inplace(Axis(0), |&prev, curr| *curr *= prev + *curr);
+
+        println!("{}", total_pairing_scores);
+
         // I don't think I need sth. like pos_list to check for contiguity? Or do I?
-        // Maybe `EncodedSequence` needs a field storing the cutting site if subsequence() glued two outer fragments?
+        // EncodedSequence has a field concatenation_site now that stores the necessary information
+        // I just need to make sure to check carefully, as we're only sliding over `halved_length`
+        // So there will be two checks probably? (again times two for pos<len and pos>=len?)
         (0, 0, 0, 0)
     }
 }
@@ -434,7 +448,9 @@ mod tests {
 
     #[test]
     fn test_consecutivepairs() {
-        let sequence = "GUGUAAG";
+        //let sequence = "GUGUAAG";
+        //GGGUUUGCGGUGUAAGUGCAGCCC
+        let sequence = "UGCGGUGUAAGUGC";
         let bpw = BasePairWeights {
             AU: 2.0,
             GC: 3.0,
@@ -442,8 +458,14 @@ mod tests {
         };
         let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
 
-        encoded.consecutive_pairs_at_lag(4);
-        encoded.consecutive_pairs_at_lag(10);
-        encoded.consecutive_pairs_at_lag(5);
+        //encoded.consecutive_pairs_at_lag(4);
+        //encoded.consecutive_pairs_at_lag(10);
+        //encoded.consecutive_pairs_at_lag(5);
+        encoded.consecutive_pairs_at_lag(21);
+        encoded.consecutive_pairs_at_lag(16);
+        encoded.consecutive_pairs_at_lag(15);
+        encoded.consecutive_pairs_at_lag(12);
+        encoded.consecutive_pairs_at_lag(9);
+        encoded.consecutive_pairs_at_lag(1);
     }
 }
