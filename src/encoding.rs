@@ -184,7 +184,11 @@ impl<'a> EncodedSequence<'a> {
 
     /// Get an copy-on-write slice of a subsequence (0-indexed).
     /// The range defined by `start` and `end` is exclusive.
-    /// If `start >= end`, a contiguous [`EncodedSequence`] is newly created, with `start` as `5'` and `end-1` as `3'`.
+    /// TODO: If `start >= end`, a contiguous [`EncodedSequence`] is newly created, with `start` as `5'` and `end-1` as `3'`.
+    // TODO: vaitea's RAFFT splits without wrapping around (which does not make a difference for pairing per se)
+    // TODO I think my approach is more intuitive but vaitea's might make it more easy later on?
+    // TODO Also: maybe I don't need to store the actual concatenation site
+    // TODO but the relative 5' site (could be negative) in my approach
     pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
         if start < end {
             let sub_fwd = self.forward.slice(s![.., start..end]);
@@ -196,6 +200,10 @@ impl<'a> EncodedSequence<'a> {
                 concatenation_site: None,
             }
         } else {
+            // let indices: Vec<usize> = (0..end).chain(start..self.len())
+            // should work as well since it does not change pairing
+            // in which case `end` should be stored as concatenation site
+            //let indices: Vec<usize> = (0..end).chain(start..self.len()).collect();
             let indices: Vec<usize> = (start..self.len()).chain(0..end).collect();
 
             // double-select to force C standard layout
@@ -212,7 +220,9 @@ impl<'a> EncodedSequence<'a> {
             Self {
                 forward: CowArray::from(sub_fwd),
                 mirrored: CowArray::from(sub_mrrd),
-                concatenation_site: Some(start),
+                //concatenation_site: Some(end),
+                //concatenation_site: Some(start),
+                concatenation_site: Some(self.len() - start), //TODO: + 1?
             }
         }
     }
@@ -224,29 +234,70 @@ impl<'a> EncodedSequence<'a> {
     ///
     /// Returns a quadruple containing the number of pairs in the sequence,
     /// the first paired positions of both strands, and a score based on the underlying [`BasePairWeights`]
-    pub fn consecutive_pairs_at_lag(&self, positional_lag: usize) -> (usize, usize, usize, usize) {
+    pub fn consecutive_pairs_at_lag(&self, positional_lag: usize) -> (usize, usize, usize, f64) {
+        let min_hairpin = 3;
+
         // Slicing this way since self.mirrored is stored in the same direction as self.forward
         // Maybe this would be simpler using `%`?
-        let (fwd_sliceinfo, mrrd_sliceinfo) = if positional_lag < self.len() {
-            (s![.., ..=positional_lag], s![.., ..=positional_lag;-1])
+        let (fwd_sliceinfo, mrrd_sliceinfo, concat_site) = if positional_lag < self.len() {
+            let concat_site = match self.concatenation_site() {
+                Some(site) => {
+                    // This is not directly apparent, so here are some notes:
+                    // If site < positional_lag the window includes the concatenation site.
+                    // In this case, we can't accumulate the scores over this site
+                    // Since we're only sliding over the first half of the window and the mirrored (reversed) sequence
+                    // is, well, mirrored, we have a symmetrical situation
+                    // and choose the minimum of site and positional_lag - site to cut off accumulation
+                    // Otherwise our offset-aligned sequences do not include the concatenation site and we're fine.
+                    if site < positional_lag {
+                        Some(site.min(positional_lag - site) + 1)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
+            (
+                s![.., ..=positional_lag],
+                s![.., ..=positional_lag;-1],
+                concat_site,
+            )
         } else {
+            let concat_site = match self.concatenation_site() {
+                Some(site) => {
+                    if site > positional_lag - self.len() + 1 {
+                        Some(site.min(site - positional_lag + self.len() - 1))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
             (
                 s![.., positional_lag - self.len() + 1..],
                 s![.., positional_lag - self.len() + 1..;-1],
+                concat_site,
             )
         };
 
-        println!("{}", self.forward);
-        println!("{}", self.mirrored);
+        //println!("{}", self.forward);
+        //println!("{}", self.mirrored);
 
         let fwd_slice = self.forward.slice(fwd_sliceinfo);
         let mrrd_slice = self.mirrored.slice(mrrd_sliceinfo);
 
-        println!("{}", fwd_slice);
-        println!("{}", mrrd_slice);
+        //println!("{}", fwd_slice);
+        //println!("{}", mrrd_slice);
 
         // Slide over half of the offset-aligned sequences since they are complementary
         let halved_length = fwd_slice.len_of(Axis(1)) / 2 + fwd_slice.len_of(Axis(1)) % 2;
+
+        // This is not pretty but we can save us the work if that's the case
+        if halved_length < min_hairpin {
+            return (0, 0, 0, 0.0);
+        }
 
         // The total pairing score per position is computed as the pairwise product
         // of the offset-aligned sequences (actually, only their first halves)
@@ -255,18 +306,75 @@ impl<'a> EncodedSequence<'a> {
             * mrrd_slice.slice(s![.., ..halved_length]))
         .sum_axis(Axis(0));
 
-        println!("{}", total_pairing_scores);
+        //println!("{}", total_pairing_scores);
+        //println!("{:?} {:?}", concat_site, self.concatenation_site());
 
-        // accumulate scores to find longest consecutive chains of paired positions
-        total_pairing_scores.accumulate_axis_inplace(Axis(0), |&prev, curr| *curr *= prev + *curr);
+        // not very idiomatic but I'm trying to stay close to the reference implementation
+        let mut max_score = total_pairing_scores[0];
+        let mut acc_pairs = if max_score > 0.0 { 1 } else { 0 };
+        let mut max_pairs = acc_pairs;
+        let mut max_i = 0;
+        let mut i = 0;
+        let (mut max_lower, mut max_upper) = if positional_lag < self.len() {
+            (0, positional_lag)
+        } else {
+            (positional_lag - self.len() + 1, self.len() - 1)
+        };
 
-        println!("{}", total_pairing_scores);
+        let accumulate_scores = |&prev: &f64, curr: &mut f64| {
+            i += 1;
 
-        // I don't think I need sth. like pos_list to check for contiguity? Or do I?
-        // EncodedSequence has a field concatenation_site now that stores the necessary information
-        // I just need to make sure to check carefully, as we're only sliding over `halved_length`
-        // So there will be two checks probably? (again times two for pos<len and pos>=len?)
-        (0, 0, 0, 0)
+            if concat_site != Some(i) {
+                *curr *= prev + *curr;
+            } else {
+                // if Some(i) == concat_site, reset accumulated pairs
+                acc_pairs = 0;
+            }
+
+            if *curr > 0.0 {
+                acc_pairs += 1;
+            } else {
+                acc_pairs = 0;
+            }
+
+            let (lower_position, upper_position) = if positional_lag < self.len() {
+                (i, positional_lag - i)
+            } else {
+                (positional_lag - self.len() + 1 + i, self.len() - i - 1)
+            };
+
+            let distance = match self.concatenation_site() {
+                Some(site) => {
+                    if lower_position >= site || upper_position < site {
+                        upper_position - lower_position
+                    } else {
+                        // We don't have access to the actual distance but both positions
+                        // flank the concatenation site
+                        // so there's enough space
+                        upper_position - lower_position + min_hairpin
+                    }
+                }
+                _ => upper_position - lower_position,
+            };
+
+            if *curr >= max_score
+            // check if there are at least 3 unpaired positions between paired positions of stack
+            && distance > min_hairpin
+            {
+                max_score = *curr;
+                max_i = i;
+                max_upper = upper_position;
+                max_lower = lower_position;
+                max_pairs = acc_pairs;
+            }
+        };
+
+        total_pairing_scores.accumulate_axis_inplace(Axis(0), accumulate_scores);
+
+        //println!("{}", total_pairing_scores);
+        //println!("{} {} {} {}", max_pairs, max_lower, max_upper, max_score);
+
+        (max_pairs, max_lower, max_upper, max_score)
     }
 }
 
@@ -448,8 +556,6 @@ mod tests {
 
     #[test]
     fn test_consecutivepairs() {
-        //let sequence = "GUGUAAG";
-        //GGGUUUGCGGUGUAAGUGCAGCCC
         let sequence = "UGCGGUGUAAGUGC";
         let bpw = BasePairWeights {
             AU: 2.0,
@@ -458,14 +564,26 @@ mod tests {
         };
         let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
 
-        //encoded.consecutive_pairs_at_lag(4);
-        //encoded.consecutive_pairs_at_lag(10);
-        //encoded.consecutive_pairs_at_lag(5);
-        encoded.consecutive_pairs_at_lag(21);
-        encoded.consecutive_pairs_at_lag(16);
-        encoded.consecutive_pairs_at_lag(15);
-        encoded.consecutive_pairs_at_lag(12);
-        encoded.consecutive_pairs_at_lag(9);
-        encoded.consecutive_pairs_at_lag(1);
+        assert_eq!(encoded.consecutive_pairs_at_lag(25), (0, 0, 0, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(23), (0, 0, 0, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(21), (0, 8, 13, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(16), (1, 3, 13, 3.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(15), (2, 5, 10, 2.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(12), (3, 2, 10, 15.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(9), (1, 0, 9, 2.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(5), (0, 0, 5, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(4), (1, 0, 4, 1.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(3), (0, 0, 0, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(2), (0, 0, 0, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(1), (0, 0, 0, 0.0));
+        assert_eq!(encoded.consecutive_pairs_at_lag(0), (0, 0, 0, 0.0));
+
+        // CGGCA ACGUAG GGGUU
+        let tobesplit = "CGGCAACGUAGGGGUU";
+        let tobesplitenc = EncodedSequence::with_basepair_weights(tobesplit, &bpw).unwrap();
+
+        let splitenc = tobesplitenc.subsequence(11, 5);
+        assert_eq!(splitenc.consecutive_pairs_at_lag(6), (1, 1, 5, 9.0));
+        assert_eq!(splitenc.consecutive_pairs_at_lag(11), (1, 4, 7, 1.0));
     }
 }
