@@ -107,7 +107,7 @@ mod tests {
     use super::*;
     use crate::encoding::*;
 
-    #[test]
+    //#[test]
     fn test_folding() {
         let sequence =
             "GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU";

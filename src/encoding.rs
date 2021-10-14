@@ -188,7 +188,7 @@ impl<'a> EncodedSequence<'a> {
     // TODO: vaitea's RAFFT splits without wrapping around (which does not make a difference for pairing per se)
     // TODO I think my approach is more intuitive but vaitea's might make it more easy later on?
     // TODO Also: maybe I don't need to store the actual concatenation site
-    // TODO but the relative 5' site (could be negative) in my approach
+    // TODO but the relative 5' site (could be negative) in my approach since this would be the only site where stacks shouldn't cross?
     pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
         if start < end {
             let sub_fwd = self.forward.slice(s![.., start..end]);
@@ -205,8 +205,8 @@ impl<'a> EncodedSequence<'a> {
             // let indices: Vec<usize> = (0..end).chain(start..self.len())
             // should work as well since it does not change pairing
             // in which case `end` should be stored as concatenation site
-            //let indices: Vec<usize> = (0..end).chain(start..self.len()).collect();
-            let indices: Vec<usize> = (start..self.len()).chain(0..end).collect();
+            let indices: Vec<usize> = (0..end).chain(start..self.len()).collect();
+            //let indices: Vec<usize> = (start..self.len()).chain(0..end).collect();
 
             // double-select to force C standard layout
             // this is hacky and not as efficient as possible but should suffice for now
@@ -222,9 +222,9 @@ impl<'a> EncodedSequence<'a> {
             Self {
                 forward: CowArray::from(sub_fwd),
                 mirrored: CowArray::from(sub_mrrd),
-                //concatenation_site: Some(end),
+                concatenation_site: Some(end),
                 //concatenation_site: Some(start),
-                concatenation_site: Some(self.len() - start), //TODO: + 1?
+                //concatenation_site: Some(self.len() - start), //TODO: + 1?
             }
         }
     }
@@ -557,7 +557,8 @@ mod tests {
             CowArray::from(encoded.mirrored.slice(s![.., 0..5]))
         );
 
-        let oligo = "AUGGG";
+        //let oligo = "AUGGG";
+        let oligo = "GGGAU";
         let encoded_oligo = EncodedSequence::with_basepair_weights(oligo, &bpw).unwrap();
         let concat_oligo = encoded.subsequence(80, 3);
 
@@ -590,7 +591,8 @@ mod tests {
         assert_eq!(encoded.consecutive_pairs_at_lag(0, 3), (0, 0, 0, 0.0));
 
         // CGGCA ACGUAG GGGUU
-        let tobesplit = "CGGCAACGUAGGGGUU";
+        //let tobesplit = "CGGCAACGUAGGGGUU";
+        let tobesplit = "GGGUUACGUAGCGGCA";
         let tobesplitenc = EncodedSequence::with_basepair_weights(tobesplit, &bpw).unwrap();
 
         let splitenc = tobesplitenc.subsequence(11, 5);
