@@ -90,3 +90,81 @@ impl RafftConfig {
         todo!()
     }
 }
+
+impl<'a> EncodedSequence<'a> {
+    /// Find the `n` best consecutive stacks for this `EncodedSequence` that can be formed
+    /// by computing first the autocorrelation and then computing the energy reduction
+    /// for the `n` best positional lags.
+    /// TODO: I need a reference structure that I can augment here
+    /// TODO: Ideally I'd already store this in a tree-like structure?
+    pub fn best_consecutive_stacks(&self, n: usize) -> bool {
+
+        todo!()
+    }
+}
+
+mod tests {
+    use super::*;
+    use crate::encoding::*;
+
+    #[test]
+    fn test_folding() {
+        let sequence =
+            "GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU";
+        let bpw = BasePairWeights {
+            AU: 2.0,
+            GC: 3.0,
+            GU: 1.0,
+        };
+        let encoded = EncodedSequence::with_basepair_weights(sequence, &bpw).unwrap();
+        let fc = VCompound::new(sequence);
+
+        let mut structure = PairTable::new(sequence.len());
+
+        let corr = encoded.autocorrelation(1.0);
+        let mut corr = corr.iter().enumerate().collect::<Vec<_>>();
+        corr.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+        corr.reverse();
+
+        let (bp, mi, mj, score) = encoded.consecutive_pairs_at_lag(corr[1].0, 3);
+
+        (0..bp).for_each(|i| {
+            structure.insert((mi - i + 1) as i16, (mj + i + 1) as i16);
+        });
+
+        println!("{}", structure.to_string());
+
+        let outer = encoded.subsequence(mj + bp, mi - bp);
+        let inner = encoded.subsequence(mi + 1, mj + 1);
+
+        let corr = outer.autocorrelation(1.0);
+        let mut corr = corr.iter().enumerate().collect::<Vec<_>>();
+        corr.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+        corr.reverse();
+
+        println!("{:?}", corr[..10].to_vec());
+
+        let (obp, omi, omj, oscore) = outer.consecutive_pairs_at_lag(corr[3].0, 3);
+
+        (0..obp).for_each(|i| {
+            structure.insert((omj + i + 1 - outer.concatenation_site().unwrap()) as i16, (mj + bp + omi + i) as i16);
+        });
+
+        println!("{}", structure.to_string());
+
+        let corr = inner.autocorrelation(1.0);
+        let mut corr = corr.iter().enumerate().collect::<Vec<_>>();
+        corr.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+        corr.reverse();
+
+        println!("{:?}", corr[..10].to_vec());
+
+        let (ibp, imi, imj, iscore) = inner.consecutive_pairs_at_lag(corr[1].0, 3);
+
+        (0..ibp).for_each(|i| {
+            structure.insert((mi + 1 + imi - i + 1) as i16, (mi + 1 + imj + i + 1) as i16);
+        });
+
+        println!("{}", structure.to_string());
+    }
+}
