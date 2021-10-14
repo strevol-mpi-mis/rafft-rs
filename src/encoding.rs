@@ -96,7 +96,8 @@ impl<'a> EncodedSequence<'a> {
 
         let mut forward = Array2::default((4, length));
         let mut mirrored = Array2::default((4, length));
-        let parent_indices = Array1::from_iter(0..length);
+        // 1-indexed for convenience
+        let parent_indices = Array1::from_iter(1..=length);
 
         match sequence.chars().enumerate().try_for_each(|(i, c)| match c {
             'A' => {

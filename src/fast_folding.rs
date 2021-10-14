@@ -130,13 +130,16 @@ mod tests {
         println!("{} {} {} {}", bp, mi, mj, score);
 
         (0..bp).for_each(|i| {
-            structure.insert((mi - i + 1) as i16, (mj + i + 1) as i16);
+            structure.insert(
+                encoded.parent_indices[mi - i] as i16,
+                encoded.parent_indices[mj + i] as i16,
+            );
         });
 
         println!("{}", structure.to_string());
 
-        let outer = encoded.subsequence(mj + bp, mi - bp - 1);
-        let inner = encoded.subsequence(mi + 1, mj + 1);
+        let outer = encoded.subsequence(mj + bp, mi - bp);
+        let inner = encoded.subsequence(mi + 1, mj);
 
         let corr = outer.autocorrelation(1.0);
         let mut corr = corr.iter().enumerate().collect::<Vec<_>>();
@@ -145,12 +148,15 @@ mod tests {
 
         println!("{:?}", corr[..10].to_vec());
 
-        let (obp, omi, omj, oscore) = outer.consecutive_pairs_at_lag(corr[2].0, 3);
+        let (obp, omi, omj, oscore) = outer.consecutive_pairs_at_lag(corr[4].0, 3);
         println!("{} {} {} {}", obp, omi, omj, oscore);
 
         // TODO: here I need to track if omi, omj are above/below concatenation site
         (0..obp).for_each(|i| {
-            structure.insert((mj + bp + omi - i) as i16, (mj + bp + omj + i) as i16);
+            structure.insert(
+                outer.parent_indices[omi - i] as i16,
+                outer.parent_indices[omj + i] as i16,
+            );
         });
 
         println!("{}", structure.to_string());
@@ -166,7 +172,10 @@ mod tests {
         println!("{} {} {} {}", ibp, imi, imj, iscore);
 
         (0..ibp).for_each(|i| {
-            structure.insert((mi + 1 + imi - i) as i16, (mi + 1 + imj + i) as i16);
+            structure.insert(
+                inner.parent_indices[imi - i] as i16,
+                inner.parent_indices[imj + i] as i16,
+            );
         });
 
         println!("{}", structure.to_string());
