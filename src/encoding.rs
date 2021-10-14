@@ -254,11 +254,6 @@ impl<'a> EncodedSequence<'a> {
         // Slide over half of the offset-aligned sequences since they are complementary
         let halved_length = fwd_slice.len_of(Axis(1)) / 2 + fwd_slice.len_of(Axis(1)) % 2;
 
-        // This is not pretty but we can save us the work if that's the case
-        if halved_length < minimal_hairpin {
-            return (0, 0, 0, 0.0);
-        }
-
         // The total pairing score per position is computed as the pairwise product
         // of the offset-aligned sequences (actually, only their first halves)
         // and then summed over all four nucleotides.
@@ -267,16 +262,28 @@ impl<'a> EncodedSequence<'a> {
         .sum_axis(Axis(0));
 
         // not very idiomatic but I'm trying to stay close to the reference implementation
-        let mut max_score = total_pairing_scores[0];
-        let mut acc_pairs = if max_score > 0.0 { 1 } else { 0 };
-        let mut max_pairs = acc_pairs;
-        let mut max_i = 0;
+        // the essential functionality could be done simpler but I want to reproduce intermediate results
         let mut i = 0;
+        let mut max_i = 0;
+        let mut max_score = 0.0;
+        let mut acc_pairs = if total_pairing_scores[0] == 0.0 { 0 } else { 1 };
+        let mut max_pairs = 0;
+
         let (mut max_lower, mut max_upper) = if positional_lag < self.len() {
             (0, positional_lag)
         } else {
             (positional_lag - self.len() + 1, self.len() - 1)
         };
+
+        if total_pairing_scores[0] >= 0.0
+            && self.parent_indices[max_upper] - self.parent_indices[max_lower] > minimal_hairpin
+        {
+            max_score = total_pairing_scores[0];
+            max_pairs = acc_pairs;
+        } else {
+            max_lower = 0;
+            max_upper = 0;
+        }
 
         let accumulate_scores = |&prev: &f64, curr: &mut f64| {
             i += 1;
@@ -325,6 +332,8 @@ impl<'a> EncodedSequence<'a> {
 /// This struct stores `i16` internally and is `1`-indexed.
 ///
 /// Refer to the [upstream API](https://www.tbi.univie.ac.at/RNA/ViennaRNA/doc/html/group__struct__utils__pair__table.html) for details.
+// Why is Array1<i16> not Copy?
+#[derive(Clone)]
 pub struct PairTable(Array1<i16>);
 
 impl PairTable {
