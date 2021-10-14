@@ -17,7 +17,7 @@
 //!
 //! where `AU`, `GC`, `GU` are weights of the base pairs.
 
-use ndarray::{arr1, s, Array1, Array2, ArrayView1, Axis, CowArray, Ix2};
+use ndarray::{arr1, s, Array1, Array2, ArrayView1, Axis, CowArray, Ix1, Ix2};
 use std::convert::TryInto;
 use thiserror::Error;
 
@@ -83,7 +83,8 @@ impl Default for MirrorAlphabet {
 pub struct EncodedSequence<'a> {
     pub(crate) forward: CowArray<'a, f64, Ix2>,
     pub(crate) mirrored: CowArray<'a, f64, Ix2>,
-    concatenation_site: Option<usize>,
+    //subsequences will carry information about the positions of their parent sequence
+    pub(crate) parent_indices: CowArray<'a, usize, Ix1>,
 }
 
 impl<'a> EncodedSequence<'a> {
@@ -95,6 +96,7 @@ impl<'a> EncodedSequence<'a> {
 
         let mut forward = Array2::default((4, length));
         let mut mirrored = Array2::default((4, length));
+        let parent_indices = Array1::from_iter(0..length);
 
         match sequence.chars().enumerate().try_for_each(|(i, c)| match c {
             'A' => {
@@ -143,7 +145,7 @@ impl<'a> EncodedSequence<'a> {
             _ => Ok(Self {
                 forward: CowArray::from(forward),
                 mirrored: CowArray::from(mirrored),
-                concatenation_site: None,
+                parent_indices: CowArray::from(parent_indices),
             }),
         }
     }
@@ -170,18 +172,6 @@ impl<'a> EncodedSequence<'a> {
         self.forward.is_empty()
     }
 
-    /// Return the position of concatenation if `&self` was created
-    /// using [`subsequence()`] from two non-contiguous fragments and `None` otherwise.
-    pub fn concatenation_site(&self) -> Option<usize> {
-        self.concatenation_site
-    }
-
-    /// Return `true` if `&self` represents a sequence concatenated from two fragments
-    /// using [`subsequence()`] and `false` otherwise.
-    pub fn is_concatenated(&self) -> bool {
-        self.concatenation_site.is_some()
-    }
-
     /// Get an copy-on-write slice of a subsequence (0-indexed).
     /// The range defined by `start` and `end` is exclusive.
     /// TODO: If `start >= end`, a contiguous [`EncodedSequence`] is newly created, with `start` as `5'` and `end-1` as `3'`.
@@ -189,17 +179,17 @@ impl<'a> EncodedSequence<'a> {
     // TODO I think my approach is more intuitive but vaitea's might make it more easy later on?
     // TODO Also: maybe I don't need to store the actual concatenation site
     // TODO but the relative 5' site (could be negative) in my approach since this would be the only site where stacks shouldn't cross?
+    // TODO: need to store multiple concatenation sites!!!
     pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
         if start < end {
             let sub_fwd = self.forward.slice(s![.., start..end]);
             let sub_mrrd = self.mirrored.slice(s![.., start..end]);
+            let sub_indices = self.parent_indices.slice(s![start..end]);
 
             Self {
                 forward: CowArray::from(sub_fwd),
                 mirrored: CowArray::from(sub_mrrd),
-                //concatenation_site: None,
-                // inherit concatenation_site if present
-                concatenation_site: self.concatenation_site().map(|site| site - start),
+                parent_indices: CowArray::from(sub_indices),
             }
         } else {
             // let indices: Vec<usize> = (0..end).chain(start..self.len())
@@ -219,12 +209,12 @@ impl<'a> EncodedSequence<'a> {
                 .select(Axis(1), &indices)
                 .select(Axis(0), &[0, 1, 2, 3]);
 
+            let sub_indices = self.parent_indices.select(Axis(0), &indices);
+
             Self {
                 forward: CowArray::from(sub_fwd),
                 mirrored: CowArray::from(sub_mrrd),
-                concatenation_site: Some(end),
-                //concatenation_site: Some(start),
-                //concatenation_site: Some(self.len() - start), //TODO: + 1?
+                parent_indices: CowArray::from(sub_indices),
             }
         }
     }
@@ -234,7 +224,9 @@ impl<'a> EncodedSequence<'a> {
     /// Search for the longest sequence of consecutive pairs of the encoded sequence and its (reversed) mirror
     /// offset-aligned by `positional_lag` using a sliding-window approach.
     ///
-    /// Sequences of consecutive pairs are prohibited from spanning over concatenation sites
+    /// Sequences of consecutive pairs are prohibited from spanning over concatenation sites.
+    /// This may the case if `self` was constructed as a subsequence.
+    ///
     /// `minimal_hairpin` is the number of unpaired positions enclosed by a stack of consecutive pairs.
     /// A sane default value is `3`.
     ///
@@ -246,46 +238,12 @@ impl<'a> EncodedSequence<'a> {
         minimal_hairpin: usize,
     ) -> (usize, usize, usize, f64) {
         // Slicing this way since self.mirrored is stored in the same direction as self.forward
-        let (fwd_sliceinfo, mrrd_sliceinfo, concat_site) = if positional_lag < self.len() {
-            let concat_site = match self.concatenation_site() {
-                Some(site) => {
-                    // This is not directly apparent, so here are some notes:
-                    // If site < positional_lag the window includes the concatenation site.
-                    // In this case, we can't accumulate the scores over this site
-                    // Since we're only sliding over the first half of the window and the mirrored (reversed) sequence
-                    // is, well, mirrored, we have a symmetrical situation
-                    // and choose the minimum of site and positional_lag - site to cut off accumulation
-                    // Otherwise our offset-aligned sequences do not include the concatenation site and we're fine.
-                    if site < positional_lag {
-                        Some(site.min(positional_lag - site) + 1)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-
-            (
-                s![.., ..=positional_lag],
-                s![.., ..=positional_lag;-1],
-                concat_site,
-            )
+        let (fwd_sliceinfo, mrrd_sliceinfo) = if positional_lag < self.len() {
+            (s![.., ..=positional_lag], s![.., ..=positional_lag;-1])
         } else {
-            let concat_site = match self.concatenation_site() {
-                Some(site) => {
-                    if site > positional_lag - self.len() + 1 {
-                        Some(site.min(site - positional_lag + self.len() - 1))
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-
             (
                 s![.., positional_lag - self.len() + 1..],
                 s![.., positional_lag - self.len() + 1..;-1],
-                concat_site,
             )
         };
 
@@ -322,11 +280,17 @@ impl<'a> EncodedSequence<'a> {
         let accumulate_scores = |&prev: &f64, curr: &mut f64| {
             i += 1;
 
-            if concat_site != Some(i) {
-                *curr *= prev + *curr;
+            let (lower_position, upper_position) = if positional_lag < self.len() {
+                (i, positional_lag - i)
             } else {
-                // if Some(i) == concat_site, reset accumulated pairs
-                acc_pairs = 0;
+                (positional_lag - self.len() + 1 + i, self.len() - i - 1)
+            };
+
+            if self.parent_indices[lower_position] - self.parent_indices[lower_position - 1] == 1
+                && self.parent_indices[upper_position + 1] - self.parent_indices[upper_position]
+                    == 1
+            {
+                *curr *= prev + *curr;
             }
 
             if *curr > 0.0 {
@@ -335,25 +299,8 @@ impl<'a> EncodedSequence<'a> {
                 acc_pairs = 0;
             }
 
-            let (lower_position, upper_position) = if positional_lag < self.len() {
-                (i, positional_lag - i)
-            } else {
-                (positional_lag - self.len() + 1 + i, self.len() - i - 1)
-            };
-
-            let distance = match self.concatenation_site() {
-                Some(site) => {
-                    if lower_position >= site || upper_position < site {
-                        upper_position - lower_position
-                    } else {
-                        // We don't have access to the actual distance but both positions
-                        // flank the concatenation site
-                        // so there's enough space
-                        upper_position - lower_position + minimal_hairpin
-                    }
-                }
-                _ => upper_position - lower_position,
-            };
+            let distance =
+                self.parent_indices[upper_position] - self.parent_indices[lower_position];
 
             if *curr >= max_score
             // check if there are at least 3 unpaired positions between paired positions of stack
@@ -440,16 +387,19 @@ impl PairTable {
 impl ToString for PairTable {
     /// Return the dot-bracket notation of the PairTable.
     fn to_string(&self) -> String {
-        self.0.indexed_iter().skip(1).map(|(i, &j)| {
-            if j == 0 {
-                '.'
-            } else if i < j as usize {
-                '('
-            } else {
-                ')'
-            }
-        })
-        .collect::<String>()
+        self.0
+            .indexed_iter()
+            .skip(1)
+            .map(|(i, &j)| {
+                if j == 0 {
+                    '.'
+                } else if i < j as usize {
+                    '('
+                } else {
+                    ')'
+                }
+            })
+            .collect::<String>()
     }
 }
 

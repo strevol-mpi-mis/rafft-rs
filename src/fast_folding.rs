@@ -98,7 +98,6 @@ impl<'a> EncodedSequence<'a> {
     /// TODO: I need a reference structure that I can augment here
     /// TODO: Ideally I'd already store this in a tree-like structure?
     pub fn best_consecutive_stacks(&self, n: usize) -> bool {
-
         todo!()
     }
 }
@@ -107,8 +106,9 @@ mod tests {
     use super::*;
     use crate::encoding::*;
 
-    //#[test]
+    #[test]
     fn test_folding() {
+        // TODO: consistent use of 1-indexes OR 0-indexes
         let sequence =
             "GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU";
         let bpw = BasePairWeights {
@@ -127,6 +127,7 @@ mod tests {
         corr.reverse();
 
         let (bp, mi, mj, score) = encoded.consecutive_pairs_at_lag(corr[1].0, 3);
+        println!("{} {} {} {}", bp, mi, mj, score);
 
         (0..bp).for_each(|i| {
             structure.insert((mi - i + 1) as i16, (mj + i + 1) as i16);
@@ -134,7 +135,7 @@ mod tests {
 
         println!("{}", structure.to_string());
 
-        let outer = encoded.subsequence(mj + bp, mi - bp);
+        let outer = encoded.subsequence(mj + bp, mi - bp - 1);
         let inner = encoded.subsequence(mi + 1, mj + 1);
 
         let corr = outer.autocorrelation(1.0);
@@ -144,10 +145,12 @@ mod tests {
 
         println!("{:?}", corr[..10].to_vec());
 
-        let (obp, omi, omj, oscore) = outer.consecutive_pairs_at_lag(corr[3].0, 3);
+        let (obp, omi, omj, oscore) = outer.consecutive_pairs_at_lag(corr[2].0, 3);
+        println!("{} {} {} {}", obp, omi, omj, oscore);
 
+        // TODO: here I need to track if omi, omj are above/below concatenation site
         (0..obp).for_each(|i| {
-            structure.insert((omj + i + 1 - outer.concatenation_site().unwrap()) as i16, (mj + bp + omi + i) as i16);
+            structure.insert((mj + bp + omi - i) as i16, (mj + bp + omj + i) as i16);
         });
 
         println!("{}", structure.to_string());
@@ -159,10 +162,11 @@ mod tests {
 
         println!("{:?}", corr[..10].to_vec());
 
-        let (ibp, imi, imj, iscore) = inner.consecutive_pairs_at_lag(corr[1].0, 3);
+        let (ibp, imi, imj, iscore) = inner.consecutive_pairs_at_lag(corr[2].0, 3);
+        println!("{} {} {} {}", ibp, imi, imj, iscore);
 
         (0..ibp).for_each(|i| {
-            structure.insert((mi + 1 + imi - i + 1) as i16, (mi + 1 + imj + i + 1) as i16);
+            structure.insert((mi + 1 + imi - i) as i16, (mi + 1 + imj + i) as i16);
         });
 
         println!("{}", structure.to_string());

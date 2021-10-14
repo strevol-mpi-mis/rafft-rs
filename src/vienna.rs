@@ -1,8 +1,7 @@
 use librna_sys::{
-    vrna_alloc, vrna_eval_structure_pt, vrna_fold_compound,
-    vrna_fold_compound_free, vrna_fold_compound_t, vrna_md_defaults_temperature,
-    vrna_md_set_default, vrna_md_t, vrna_params_load, VRNA_OPTION_EVAL_ONLY,
-    VRNA_PARAMETER_FORMAT_DEFAULT,
+    vrna_alloc, vrna_eval_structure_pt, vrna_fold_compound, vrna_fold_compound_free,
+    vrna_fold_compound_t, vrna_md_defaults_temperature, vrna_md_set_default, vrna_md_t,
+    vrna_params_load, VRNA_OPTION_EVAL_ONLY, VRNA_PARAMETER_FORMAT_DEFAULT,
 };
 use ndarray::ArrayView1;
 use std::convert::TryInto;
