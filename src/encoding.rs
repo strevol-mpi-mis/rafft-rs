@@ -79,7 +79,7 @@ impl Default for MirrorAlphabet {
 
 /// An [`EncodedSequence`] consists of a _forward_ encoding and a _mirrored_ encoding.
 /// See the [module-level description](crate::encoding) for details.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EncodedSequence<'a> {
     pub(crate) forward: CowArray<'a, f64, Ix2>,
     pub(crate) mirrored: CowArray<'a, f64, Ix2>,

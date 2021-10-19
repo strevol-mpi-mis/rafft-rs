@@ -4,7 +4,7 @@
 //! Note that energy parameters and temperature are set globally (available via CLI, crate root and python bindings)
 
 use crate::autocorrelation::*;
-use crate::encoding::{BasePairWeights, EncodedSequence};
+use crate::encoding::{BasePairWeights, EncodedSequence, PairTable};
 use crate::folding_graph::*;
 use crate::vienna::VCompound;
 
@@ -86,44 +86,18 @@ impl RafftConfig {
         let encoded = EncodedSequence::with_basepair_weights(sequence, &self.basepair_weights)
             .expect("Not a valid RNA Sequence!");
 
-        let mut ffgraph = RafftGraph::new(encoded);
+        let mut ffgraph = RafftGraph::new(
+            encoded,
+            fc,
+            self.min_unpaired,
+            self.min_loop_energy,
+            self.number_of_lags,
+            self.number_of_branches,
+            self.saved_trajectories,
+        );
 
-        let current_nodes = vec![ffgraph.root()];
-
-        self.breadth_first_search(&fc, &mut ffgraph, &current_nodes);
-
+        ffgraph.construct_trajectories();
         vec![]
-    }
-
-    pub fn trajectories(&mut self) -> Vec<String> {
-        if self.stored_trajectories.is_empty() {
-            eprintln!("WARNING: No trajectories stored yet. Consider calling fold() first.");
-        }
-        todo!()
-    }
-
-    fn breadth_first_search(&self, fc: &VCompound, ffgraph: &mut RafftGraph, nodes: &[NodeIndex]) {
-        let mut new_nodes: Vec<NodeIndex> = vec![]; // Vec::with_capacity() would be better as soon as I know a good guess for the capacity
-
-        nodes.iter().for_each(|structure_id| {
-            ffgraph.inner[*structure_id]
-                .sub_nodes
-                .iter()
-                .for_each(|encoded| {});
-        });
-
-        // self.breadth_first_search(fc, ffgraph);
-    }
-}
-
-impl<'a> EncodedSequence<'a> {
-    /// Find the `n` best consecutive stacks for this `EncodedSequence` that can be formed
-    /// by computing first the autocorrelation and then computing the energy reduction
-    /// for the `n` best positional lags.
-    /// TODO: I need a reference structure that I can augment here
-    /// TODO: Ideally I'd already store this in a tree-like structure?
-    pub fn best_consecutive_stacks(&self, n: usize) -> bool {
-        todo!()
     }
 }
 
