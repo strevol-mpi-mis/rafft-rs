@@ -5,6 +5,7 @@
 
 use crate::autocorrelation::*;
 use crate::encoding::{BasePairWeights, EncodedSequence};
+use crate::folding_graph::*;
 use crate::vienna::VCompound;
 
 pub struct RafftConfig {
@@ -74,13 +75,24 @@ impl RafftConfig {
         self
     }
 
-    pub fn fold(&mut self, sequence: &str) -> (f64, String) {
+    //TODO -> Should return a `RafftTree` or `RafftGraph` which can then be traversed
+    // IF my node information is Copy + Eq + Hash, I could use petgraph::GraphMap which would be nice
+    // So maybe instead of EncodedSequence I can just store information about endices, energy?
+    // if I store (n, mi, mj, mscore), I should store the indices adjusted to the complete sequences (see parent_indices)
+    // Otherwise I'd had to repeat all the steps
+    pub fn fold(&mut self, sequence: &str) -> Vec<(f64, String)> {
         let fc = VCompound::new(sequence);
 
         let encoded = EncodedSequence::with_basepair_weights(sequence, &self.basepair_weights)
             .expect("Not a valid RNA Sequence!");
 
-        todo!()
+        let mut ffgraph = RafftGraph::new(encoded);
+
+        let current_nodes = vec![ffgraph.root()];
+
+        self.breadth_first_search(&fc, &mut ffgraph, &current_nodes);
+
+        vec![]
     }
 
     pub fn trajectories(&mut self) -> Vec<String> {
@@ -88,6 +100,19 @@ impl RafftConfig {
             eprintln!("WARNING: No trajectories stored yet. Consider calling fold() first.");
         }
         todo!()
+    }
+
+    fn breadth_first_search(&self, fc: &VCompound, ffgraph: &mut RafftGraph, nodes: &[NodeIndex]) {
+        let mut new_nodes: Vec<NodeIndex> = vec![]; // Vec::with_capacity() would be better as soon as I know a good guess for the capacity
+
+        nodes.iter().for_each(|structure_id| {
+            ffgraph.inner[*structure_id]
+                .sub_nodes
+                .iter()
+                .for_each(|encoded| {});
+        });
+
+        // self.breadth_first_search(fc, ffgraph);
     }
 }
 

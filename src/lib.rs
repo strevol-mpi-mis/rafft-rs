@@ -13,6 +13,9 @@ pub mod encoding;
 /// Implementation of the RAFFT fast-folding algorithm.
 #[allow(dead_code)]
 pub mod fast_folding;
+/// A graph structure used be the RAFFT fast-folding algorithm.
+#[allow(dead_code)]
+pub mod folding_graph;
 //#[cfg(feature = "rna")]
 /// Purpose-specific bindings for ViennaRNA
 #[allow(dead_code)]

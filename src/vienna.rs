@@ -42,10 +42,16 @@ impl VCompound {
 
     /// Compute the minimum free energy of an RNA secondary structure provided as a pair table.
     /// Pair tables are 1-indexed and contain the structure's length at position 0.
-    pub fn evaluate_structure(&self, pairtable: ArrayView1<i16>) -> f64 {
+    pub fn evaluate_structure(&self, pairtable: ArrayView1<i16>) -> i32 {
         assert_eq!(pairtable.len(), self.length + 1);
-        let mfe = unsafe { vrna_eval_structure_pt(self.fc, pairtable.as_ptr()) };
-        mfe as f64 * 0.01
+        unsafe { vrna_eval_structure_pt(self.fc, pairtable.as_ptr()) }
+    }
+
+    /// Compute the minimum free energy of an RNA secondary structure provided as a pair table.
+    /// Pair tables are 1-indexed and contain the structure's length at position 0.
+    /// **This returns `[evaluate_structure()] * 0.01` (`kcal/mol`)**
+    pub fn evaluate_structure_f64(&self, pairtable: ArrayView1<i16>) -> f64 {
+        self.evaluate_structure(pairtable) as f64 * 0.01
     }
 }
 
@@ -96,6 +102,6 @@ mod tests {
             0, 0, 0, 27, 26, 25, 0, 0,
         ]);
 
-        assert_eq!(-25.8f64, vc.evaluate_structure(pt.view()));
+        assert_eq!(-25.8f64, vc.evaluate_structure_f64(pt.view()));
     }
 }
