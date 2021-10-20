@@ -1,7 +1,8 @@
 use crate::encoding::{EncodedSequence, PairTable};
 use crate::vienna::VCompound;
+use itertools::Itertools;
 use petgraph::graph::DiGraph;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub use petgraph::graph::NodeIndex;
 
@@ -78,16 +79,16 @@ impl<'a> RafftGraph<'a> {
         self.root
     }
 
-    /// Insert a new structure as child of `parent` with associated `NodeEdgeInfo` `e`.
+    /// Insert a new structure as child of `parent`.
     /// If the structure is already present, the `NodeIndex` of the existing node is returned.
     /// A new edge is added anyway if there was not already an edge starting from `parent`.
     /// Therefore, a `RafftGraph` is usually not a tree.
-    /// If the edge is already present, its `RafftEdgeInfo` is updated.
     pub fn insert(
         &mut self,
         parent: NodeIndex,
         sub_nodes: Vec<EncodedSequence<'a>>,
         structure: PairTable,
+        energy: i32,
     ) -> NodeIndex {
         let depth = self.inner[parent].depth + 1;
 
@@ -96,7 +97,7 @@ impl<'a> RafftGraph<'a> {
         let info = RafftNodeInfo {
             sub_nodes,
             structure,
-            energy: 0,
+            energy,
             depth,
         };
 
@@ -112,6 +113,11 @@ impl<'a> RafftGraph<'a> {
         self.inner.update_edge(parent, node_index, ());
         node_index
     }
+
+    // Return whether the fast folding graph already contains a structure with the provided dot-bracket notation.
+    pub fn contains(&self, structure: &str) -> bool {
+        self.node_table.get(structure).is_some()
+    }
 }
 
 impl<'a> RafftGraph<'a> {
@@ -123,54 +129,114 @@ impl<'a> RafftGraph<'a> {
 
     /// Recursively construct the fast folding graph layer-per-layer.
     fn breadth_first_search(&'a mut self, nodes: &[NodeIndex]) {
-        let mut new_nodes: Vec<NodeIndex> = vec![]; // Vec::with_capacity() would be better as soon as I know a good guess for the capacity
+        // Using iterators nested in a for-loop because
+        // nested iterators and borrowing still is elusive to me.
+        // Also, triple-nested Vec is probably not very efficient
+        // `all_children` is a Vec containing all children of the current step
+        // (i.e. for all `structure_id`s' sub-nodes all the inner and outer fragments
+        // that were generated based on global parameters
+        let mut all_children: Vec<
+            Vec<
+                Vec<(
+                    Option<EncodedSequence>,
+                    Option<EncodedSequence>,
+                    PairTable,
+                    i32,
+                )>,
+            >,
+        > = Vec::with_capacity(nodes.len());
 
-        /*let children: Vec<_> = nodes
-        .iter()
-        .map(|structure_id| {
-            let energy = self.inner[*structure_id].energy;
-            let pt = self.inner[*structure_id].structure.clone();
-
-            self.inner[*structure_id]
-                .sub_nodes
-                .iter()
-                .map(|encoded| {
-                    self.create_children(
-                        encoded,
-                        energy,
-                        &pt,
-                    )
-                })
-                .collect::<Vec<_>>();
-
-            (structure_id)
-            /*(
-                structure_id,
-                ffgraph.inner[*structure_id]
-                    .sub_nodes
-                    .iter()
-                    .map(|encoded| create_children(self.number_of_lags, self.min_unpaired, self.min_loop_energy, fc, encoded, energy, &pt))
-                    .collect::<Vec<_>>(),
-            )*/
-        })
-        .collect();*/
         for structure_id in nodes {
             let energy = self.inner[*structure_id].energy;
             let pt = self.inner[*structure_id].structure.clone();
 
-            for encoded in &self.inner[*structure_id].sub_nodes {
-                self.create_children(encoded, energy, &pt);
-
-                self.inner[*structure_id]
+            all_children.push(
+                //self.inner[*structure_id]
+                self.inner
+                    .node_weight_mut(*structure_id)
+                    .unwrap()
                     .sub_nodes
                     .iter()
                     .map(|encoded| self.create_children(encoded, energy, &pt))
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>(),
+            );
+        }
+
+        let mut i_branch = 0;
+
+        // unfortunately I seem to need this due to borrowing issues
+        // in the reference implementation this gets passed down during recursion
+        // but I think I can leave it locally for now
+        let mut seen: HashSet<String> = HashSet::new();
+
+        // parent, sub_nodes, structure, energy
+        let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> = vec![]; // Vec::with_capacity() would be better as soon as I know a good guess for the capacity
+
+        for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
+            for combined_helix in node_children
+                .iter()
+                .map(|inner| inner.iter())
+                .multi_cartesian_product()
+            {
+                let mut sub_nodes: Vec<EncodedSequence> = vec![];
+                let mut pt = PairTable::new(self.fc.len());
+
+                for helix_part in combined_helix {
+                    helix_part
+                        .2
+                        .paired()
+                        .for_each(|(i, j)| pt.insert(i as i16, j as i16));
+
+                    // TODO: maybe I shouldn't store sub_nodes in RafftNodeInfo but references
+                    // TODO: use a hashmap or BTreeMap to store sub_nodes or sequence fragments
+                    // TODO: However, if EncodedSequence's fields are CowRepr::View, it should be no problem?
+                    // TODO: I could do inner/outer.subsequence(0,inner/outer.len()) to get CowRepr::View?
+                    // TODO: but this seems to cause lifetime issues
+                    if let Some(inner) = &helix_part.0 {
+                        sub_nodes.push(inner.clone());
+                    }
+
+                    if let Some(outer) = &helix_part.1 {
+                        sub_nodes.push(outer.clone());
+                    }
+                }
+
+                let structure_string = pt.to_string();
+
+                if !self.contains(&structure_string) && seen.insert(structure_string) {
+                    i_branch += 1;
+
+                    let energy = self.fc.evaluate_structure(pt.view());
+                    new_children.push((*structure_id, sub_nodes, pt, energy));
+                }
+
+                if i_branch >= self.number_of_branches {
+                    break;
+                }
             }
         }
 
-        // self.breadth_first_search(fc, ffgraph);
-        todo!()
+        // sort by energy
+        new_children.sort_by_key(|child| child.3);
+        new_children = new_children[..self.saved_trajectories].to_vec();
+
+        /*let new_nodes: Vec<NodeIndex> = new_children
+                    .into_iter()
+                    .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+                    .collect();
+        */
+        let mut new_nodes: Vec<NodeIndex> = vec![];
+
+        for (parent, sub_nodes, pt, energy) in new_children {
+            self.insert(parent, sub_nodes, pt, energy);
+        }
+
+        // TODO: not sure yet about the stop condition but I think the way I'm doing it,
+        // TODO: new_nodes should be empty if no new structures were found
+
+        /*if !new_nodes.is_empty() {
+            self.breadth_first_search(&new_nodes);
+        }*/
     }
 
     fn create_children(
@@ -213,8 +279,8 @@ impl<'a> RafftGraph<'a> {
                             None
                         };
 
-                        let outer = if mj - mi > 1 {
-                            None //Some(parent_fragment.subsequence(mj + bp, mi - bp))
+                        let outer = if mi + 1 > bp || mj + bp < parent_fragment.len() {
+                            Some(parent_fragment.subsequence(mj + bp, mi - bp))
                         } else {
                             None
                         };

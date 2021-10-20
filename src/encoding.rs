@@ -374,15 +374,18 @@ impl PairTable {
 
     /// Insert a new pair into the [`PairTable`].
     /// Does not check for crossing pairs.
-    /// Panics if supplied positions are out of range or already paired.
+    /// Panics if supplied positions are out of range or inserting `i` or `j` would conflict with other pairs.
+    /// However, re-inserting pairs is accepted, albeit not a no-op.
     pub fn insert(&mut self, i: i16, j: i16) {
         assert!(0 < i && i <= self.len().try_into().unwrap());
         assert!(0 < j && j <= self.len().try_into().unwrap());
 
         assert_ne!(i, j);
 
-        assert_eq!(self.0[i as usize], 0);
-        assert_eq!(self.0[j as usize], 0);
+        //assert_eq!(self.0[i as usize], 0);
+        //assert_eq!(self.0[j as usize], 0);
+        assert!(self.0[i as usize] == 0 || self.0[i as usize] == j);
+        assert!(self.0[j as usize] == 0 || self.0[j as usize] == i);
 
         self.0[i as usize] = j;
         self.0[j as usize] = i;

@@ -53,6 +53,12 @@ impl VCompound {
     pub fn evaluate_structure_f64(&self, pairtable: ArrayView1<i16>) -> f64 {
         self.evaluate_structure(pairtable) as f64 * 0.01
     }
+
+    /// Return the length of the underlying sequence of the fold compound.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.length
+    }
 }
 
 impl Drop for VCompound {
