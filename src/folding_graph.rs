@@ -114,7 +114,7 @@ impl RafftGraph {
         node_index
     }
 
-    // Return whether the fast folding graph already contains a structure with the provided dot-bracket notation.
+    /// Return whether the fast folding graph already contains a structure with the provided dot-bracket notation.
     pub fn contains(&self, structure: &str) -> bool {
         self.node_table.get(structure).is_some()
     }
@@ -162,7 +162,7 @@ impl RafftGraph {
 
         let mut i_branch = 0;
 
-        // unfortunately I seem to need this due to borrowing issues
+        // unfortunately I seem to need this because I don't want to insert first and then remove unnecessary nodes?
         // in the reference implementation this gets passed down during recursion
         // but I think I can leave it locally for now
         let mut seen: HashSet<String> = HashSet::new();
@@ -185,11 +185,6 @@ impl RafftGraph {
                         .paired()
                         .for_each(|(i, j)| pt.insert(i as i16, j as i16));
 
-                    // TODO: maybe I shouldn't store sub_nodes in RafftNodeInfo but references
-                    // TODO: use a hashmap or BTreeMap to store sub_nodes or sequence fragments
-                    // TODO: However, if EncodedSequence's fields are CowRepr::View, it should be no problem?
-                    // TODO: I could do inner/outer.subsequence(0,inner/outer.len()) to get CowRepr::View?
-                    // TODO: but this seems to cause lifetime issues
                     if let Some(inner) = &helix_part.0 {
                         sub_nodes.push(inner.clone());
                     }
@@ -216,21 +211,17 @@ impl RafftGraph {
 
         // sort by energy
         new_children.sort_by_key(|child| child.3);
-        new_children = new_children[..self.saved_trajectories].to_vec();
+        new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
 
         let new_nodes: Vec<NodeIndex> = new_children
             .into_iter()
             .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
             .collect();
 
-        /*let mut new_nodes: Vec<NodeIndex> = vec![];
-
-        for (parent, sub_nodes, pt, energy) in new_children {
-            self.insert(parent, sub_nodes, pt, energy);
-        }*/
-
         // TODO: not sure yet about the stop condition but I think the way I'm doing it,
         // TODO: new_nodes should be empty if no new structures were found
+
+        println!("{:?}", new_nodes);
 
         if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
@@ -272,13 +263,14 @@ impl RafftGraph {
 
                     if (energy - reference_energy) as f64 * 0.01 < self.min_loop_energy {
                         let inner = if mj - mi > 1 {
+                            //self.min_unpaired { // > 1 in reference implementation
                             Some(parent_fragment.subsequence(mi + 1, mj))
                         } else {
                             None
                         };
 
                         let outer = if mi + 1 > bp || mj + bp < parent_fragment.len() {
-                            Some(parent_fragment.subsequence(mj + bp, mi - bp))
+                            Some(parent_fragment.subsequence(mj + bp, mi - bp + 1))
                         } else {
                             None
                         };

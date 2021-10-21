@@ -5,6 +5,9 @@ use ndarray::Array1;
 use realfft::RealFftPlanner;
 
 fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
+    assert_ne!(a.len(), 0);
+    assert_ne!(b.len(), 0);
+
     let length = a.len() + b.len() - 1;
 
     let mut planner = RealFftPlanner::<f64>::new();
@@ -55,14 +58,7 @@ impl EncodedSequence {
             .rows()
             .into_iter()
             .zip(self.mirrored.rows().into_iter())
-            .map(|(f, m)| {
-                // if I'd reverse, this would cause an extra allocation
-                //let mut m_reversed = m.as_slice().unwrap().to_vec();
-                //m_reversed.reverse();
-                //convolution(f.as_slice().unwrap(), &m_reversed)
-                // So far, I don't see any reason to store EncodedSequence.mirrored in reverse.
-                convolution(f.as_slice().unwrap(), m.as_slice().unwrap())
-            })
+            .map(|(f, m)| convolution(f.as_slice().unwrap(), m.as_slice().unwrap()))
             .collect::<Vec<_>>();
 
         let shape = correlates[0].dim();
