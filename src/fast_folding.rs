@@ -39,7 +39,7 @@ impl RafftConfig {
         Self::default()
     }
 
-    pub fn basepair_weights(&mut self, au: f64, gc: f64, gu: f64) -> &mut Self {
+    pub fn basepair_weights(mut self, au: f64, gc: f64, gu: f64) -> Self {
         self.basepair_weights = BasePairWeights {
             AU: au,
             GC: gc,
@@ -48,27 +48,27 @@ impl RafftConfig {
         self
     }
 
-    pub fn minimum_unpaired_in_hairpins(&mut self, min_unpaired: usize) -> &mut Self {
+    pub fn minimum_unpaired_in_hairpins(mut self, min_unpaired: usize) -> Self {
         self.min_unpaired = min_unpaired;
         self
     }
 
-    pub fn minimum_loop_energy(&mut self, min_loop_energy: f64) -> &mut Self {
+    pub fn minimum_loop_energy(mut self, min_loop_energy: f64) -> Self {
         self.min_loop_energy = min_loop_energy;
         self
     }
 
-    pub fn positional_lags(&mut self, number_of_lags: usize) -> &mut Self {
+    pub fn positional_lags(mut self, number_of_lags: usize) -> Self {
         self.number_of_lags = number_of_lags;
         self
     }
 
-    pub fn maximum_branches(&mut self, number_of_branches: usize) -> &mut Self {
+    pub fn maximum_branches(mut self, number_of_branches: usize) -> Self {
         self.number_of_branches = number_of_branches;
         self
     }
 
-    pub fn maximum_trajectories(&mut self, saved_trajectories: usize) -> &mut Self {
+    pub fn maximum_trajectories(mut self, saved_trajectories: usize) -> Self {
         self.saved_trajectories = saved_trajectories;
         self
     }
@@ -115,7 +115,7 @@ mod tests {
         let sequence =
             "GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU";
 
-        let config = RafftConfig::new();
+        let config = RafftConfig::new().maximum_trajectories(5);
 
         config.fold(sequence);
     }
