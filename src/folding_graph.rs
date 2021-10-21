@@ -8,9 +8,9 @@ pub use petgraph::graph::NodeIndex;
 
 /// Information stored per Node in a `RafftGraph`
 //#[derive(Clone, Eq, Hash, PartialEq)]
-pub struct RafftNodeInfo<'a> {
+pub struct RafftNodeInfo {
     /// Encoded subsequences for this structure,
-    pub sub_nodes: Vec<EncodedSequence<'a>>,
+    pub sub_nodes: Vec<EncodedSequence>,
     /// structure of this node, corresponds to its parent's structure + stack gained through the corresponding edge
     pub structure: PairTable,
     /// cached free energy of the structure
@@ -21,8 +21,8 @@ pub struct RafftNodeInfo<'a> {
 
 /// Fast-folding graph containing the folding trajectories and associated information.
 // TODO: do I need to handle inner  and outer fragments in the graph?
-pub struct RafftGraph<'a> {
-    pub(crate) inner: DiGraph<RafftNodeInfo<'a>, ()>,
+pub struct RafftGraph {
+    pub(crate) inner: DiGraph<RafftNodeInfo, ()>,
     node_table: HashMap<String, NodeIndex>,
     root: NodeIndex,
     fc: VCompound,
@@ -33,11 +33,11 @@ pub struct RafftGraph<'a> {
     saved_trajectories: usize,
 }
 
-impl<'a> RafftGraph<'a> {
+impl RafftGraph {
     /// Construct new graph containing only the root node
     /// with `n` being the sequence length.
     pub fn new(
-        root: EncodedSequence<'a>,
+        root: EncodedSequence,
         fold_compound: VCompound,
         min_unpaired: usize,
         min_loop_energy: f64,
@@ -86,7 +86,7 @@ impl<'a> RafftGraph<'a> {
     pub fn insert(
         &mut self,
         parent: NodeIndex,
-        sub_nodes: Vec<EncodedSequence<'a>>,
+        sub_nodes: Vec<EncodedSequence>,
         structure: PairTable,
         energy: i32,
     ) -> NodeIndex {
@@ -120,15 +120,16 @@ impl<'a> RafftGraph<'a> {
     }
 }
 
-impl<'a> RafftGraph<'a> {
+impl RafftGraph {
     /// Construct folding trajectories recursively in a breadth-first fashion, starting from the root.
-    pub fn construct_trajectories(&'a mut self) {
+    pub fn construct_trajectories(&mut self) {
         let current_nodes = vec![self.root()];
         self.breadth_first_search(&current_nodes);
     }
 
     /// Recursively construct the fast folding graph layer-per-layer.
-    fn breadth_first_search(&'a mut self, nodes: &[NodeIndex]) {
+    #[allow(clippy::type_complexity)]
+    fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
         // Using iterators nested in a for-loop because
         // nested iterators and borrowing still is elusive to me.
         // Also, triple-nested Vec is probably not very efficient
@@ -151,10 +152,7 @@ impl<'a> RafftGraph<'a> {
             let pt = self.inner[*structure_id].structure.clone();
 
             all_children.push(
-                //self.inner[*structure_id]
-                self.inner
-                    .node_weight_mut(*structure_id)
-                    .unwrap()
+                self.inner[*structure_id]
                     .sub_nodes
                     .iter()
                     .map(|encoded| self.create_children(encoded, energy, &pt))
@@ -220,33 +218,33 @@ impl<'a> RafftGraph<'a> {
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories].to_vec();
 
-        /*let new_nodes: Vec<NodeIndex> = new_children
-                    .into_iter()
-                    .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
-                    .collect();
-        */
-        let mut new_nodes: Vec<NodeIndex> = vec![];
+        let new_nodes: Vec<NodeIndex> = new_children
+            .into_iter()
+            .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+            .collect();
+
+        /*let mut new_nodes: Vec<NodeIndex> = vec![];
 
         for (parent, sub_nodes, pt, energy) in new_children {
             self.insert(parent, sub_nodes, pt, energy);
-        }
+        }*/
 
         // TODO: not sure yet about the stop condition but I think the way I'm doing it,
         // TODO: new_nodes should be empty if no new structures were found
 
-        /*if !new_nodes.is_empty() {
+        if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
-        }*/
+        }
     }
 
     fn create_children(
         &self,
-        parent_fragment: &'a EncodedSequence<'a>,
+        parent_fragment: &EncodedSequence,
         reference_energy: i32,
         parent_structure: &PairTable,
     ) -> Vec<(
-        Option<EncodedSequence<'a>>,
-        Option<EncodedSequence<'a>>,
+        Option<EncodedSequence>,
+        Option<EncodedSequence>,
         PairTable,
         i32,
     )> {

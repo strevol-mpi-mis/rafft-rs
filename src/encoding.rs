@@ -17,7 +17,7 @@
 //!
 //! where `AU`, `GC`, `GU` are weights of the base pairs.
 
-use ndarray::{arr1, s, Array1, Array2, ArrayView1, Axis, CowArray, Ix1, Ix2};
+use ndarray::{arr1, s, Array1, Array2, ArrayView1, Axis, Ix1, Ix2};
 use std::convert::TryInto;
 use thiserror::Error;
 
@@ -80,14 +80,14 @@ impl Default for MirrorAlphabet {
 /// An [`EncodedSequence`] consists of a _forward_ encoding and a _mirrored_ encoding.
 /// See the [module-level description](crate::encoding) for details.
 #[derive(Debug, Clone)]
-pub struct EncodedSequence<'a> {
-    pub(crate) forward: CowArray<'a, f64, Ix2>,
-    pub(crate) mirrored: CowArray<'a, f64, Ix2>,
+pub struct EncodedSequence {
+    pub(crate) forward: Array2<f64>,
+    pub(crate) mirrored: Array2<f64>,
     //subsequences will carry information about the positions of their parent sequence
-    pub(crate) parent_indices: CowArray<'a, usize, Ix1>,
+    pub(crate) parent_indices: Array1<usize>,
 }
 
-impl<'a> EncodedSequence<'a> {
+impl EncodedSequence {
     /// Encode an RNA sequence with given [`BasePairWeights`] being stored in the mirrored encoded sequence.
     pub fn with_basepair_weights(sequence: &str, weights: &BasePairWeights) -> Result<Self, Error> {
         let mirrored_alphabet = MirrorAlphabet::new(weights);
@@ -144,9 +144,9 @@ impl<'a> EncodedSequence<'a> {
         }) {
             Err(e) => Err(e),
             _ => Ok(Self {
-                forward: CowArray::from(forward),
-                mirrored: CowArray::from(mirrored),
-                parent_indices: CowArray::from(parent_indices),
+                forward,
+                mirrored,
+                parent_indices,
             }),
         }
     }
@@ -181,16 +181,16 @@ impl<'a> EncodedSequence<'a> {
     // TODO Also: maybe I don't need to store the actual concatenation site
     // TODO but the relative 5' site (could be negative) in my approach since this would be the only site where stacks shouldn't cross?
     // TODO: need to store multiple concatenation sites!!!
-    pub fn subsequence(&'a self, start: usize, end: usize) -> Self {
+    pub fn subsequence(&self, start: usize, end: usize) -> Self {
         if start < end {
             let sub_fwd = self.forward.slice(s![.., start..end]);
             let sub_mrrd = self.mirrored.slice(s![.., start..end]);
             let sub_indices = self.parent_indices.slice(s![start..end]);
 
             Self {
-                forward: CowArray::from(sub_fwd),
-                mirrored: CowArray::from(sub_mrrd),
-                parent_indices: CowArray::from(sub_indices),
+                forward: sub_fwd.to_owned(),
+                mirrored: sub_mrrd.to_owned(),
+                parent_indices: sub_indices.to_owned(),
             }
         } else {
             // let indices: Vec<usize> = (0..end).chain(start..self.len())
@@ -213,15 +213,15 @@ impl<'a> EncodedSequence<'a> {
             let sub_indices = self.parent_indices.select(Axis(0), &indices);
 
             Self {
-                forward: CowArray::from(sub_fwd),
-                mirrored: CowArray::from(sub_mrrd),
-                parent_indices: CowArray::from(sub_indices),
+                forward: sub_fwd,
+                mirrored: sub_mrrd,
+                parent_indices: sub_indices,
             }
         }
     }
 }
 
-impl<'a> EncodedSequence<'a> {
+impl EncodedSequence {
     /// Search for the longest sequence of consecutive pairs of the encoded sequence and its (reversed) mirror
     /// offset-aligned by `positional_lag` using a sliding-window approach.
     ///
@@ -509,15 +509,15 @@ mod tests {
         let sub = encoded.subsequence(0, 5);
 
         // TODO: These assertions are rather implementation-specific.
-        assert!(sub.forward.is_view());
-        assert!(sub.mirrored.is_view());
+        //assert!(sub.forward.is_view());
+        //assert!(sub.mirrored.is_view());
         assert_eq!(
             sub.forward,
-            CowArray::from(encoded.forward.slice(s![.., 0..5]))
+            encoded.forward.slice(s![.., 0..5]) //CowArray::from(encoded.forward.slice(s![.., 0..5]))
         );
         assert_eq!(
             sub.mirrored,
-            CowArray::from(encoded.mirrored.slice(s![.., 0..5]))
+            encoded.mirrored.slice(s![.., 0..5]) //CowArray::from(encoded.mirrored.slice(s![.., 0..5]))
         );
 
         //let oligo = "AUGGG";

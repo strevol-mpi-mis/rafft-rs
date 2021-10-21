@@ -43,7 +43,7 @@ fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
     Array1::from_vec(out_ab)
 }
 
-impl<'a> EncodedSequence<'a> {
+impl EncodedSequence {
     /// Compute the (auto)correlation of an [`EncodedSequence`] with its complementary strand representation using FFT.
     /// TODO: Is there really a need for the `padding` parameter?
     /// A sane value for `padding` is `1.0`.

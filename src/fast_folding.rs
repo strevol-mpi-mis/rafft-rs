@@ -15,7 +15,6 @@ pub struct RafftConfig {
     number_of_lags: usize,
     number_of_branches: usize,
     saved_trajectories: usize,
-    stored_trajectories: Vec<String>, // TODO: actual tree structure
 }
 
 impl Default for RafftConfig {
@@ -31,7 +30,6 @@ impl Default for RafftConfig {
             number_of_lags: 100,
             number_of_branches: 1000,
             saved_trajectories: 1,
-            stored_trajectories: vec![],
         }
     }
 }
@@ -80,7 +78,7 @@ impl RafftConfig {
     // So maybe instead of EncodedSequence I can just store information about endices, energy?
     // if I store (n, mi, mj, mscore), I should store the indices adjusted to the complete sequences (see parent_indices)
     // Otherwise I'd had to repeat all the steps
-    pub fn fold(&mut self, sequence: &str) -> Vec<(f64, String)> {
+    pub fn fold(&mut self, sequence: &str) {
         let fc = VCompound::new(sequence);
 
         let encoded = EncodedSequence::with_basepair_weights(sequence, &self.basepair_weights)
@@ -97,7 +95,15 @@ impl RafftConfig {
         );
 
         ffgraph.construct_trajectories();
-        vec![]
+
+        ffgraph.inner.node_weights().for_each(|node| {
+            println!(
+                "[{}] {} {}",
+                node.depth,
+                node.structure.to_string(),
+                node.energy as f64 * 0.01
+            );
+        });
     }
 }
 
