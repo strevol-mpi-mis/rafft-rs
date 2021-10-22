@@ -20,8 +20,6 @@ Alternatively, append `--features librna-sys/auto` to invocations of `cargo` if 
 
 ## Building
 
-**Note: Python bindings are not yet usable!**
-
 To build the main CLI executable `rufft`, run
 
 ```sh
@@ -44,9 +42,17 @@ target/release/rufft -h
 
 ```python
 # It is currently required to have librafft.so in the same directory as your python code
-import librafft
+from librafft import FastFoldingGraph, set_temperature, set_energy_parameters
+
+# with optional (named or ordered) parameters:
+# number_of_lags = 100,
+# number_of_branches = 1000,
+# saved_trajectories = 1,
+# au = 2.0,
+# gc = 3.0,
+# gu = 1.0,
+# min_unpaired = 3,
+# min_loop_energy = 0.0
+ffgraph = FastFoldingGraph("GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU")
+print(ffgraph.trajectories())
 ```
-
-## TODO
-
-- [] license?

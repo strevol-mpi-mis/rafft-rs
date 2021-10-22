@@ -69,6 +69,12 @@ impl Drop for VCompound {
     }
 }
 
+// TODO: check safety for this
+// https://medium.com/dwelo-r-d/wrapping-unsafe-c-libraries-in-rust-d75aeb283c65
+// see bindings.rs #[pyclass(unsendable)]
+//unsafe impl Send for VCompound {}
+//unsafe impl Sync for VCompound {}
+
 /// Set the temperature of the Nearest-Neighbor model in `ViennaRNA` globally.
 /// Refer to the [upstream API](https://www.tbi.univie.ac.at/RNA/ViennaRNA/doc/html/group__model__details.html#gaf9e527e9a2f7e6fd6e42bc6e602f5445) for details.
 pub fn set_global_temperature(temperature: f64) {
