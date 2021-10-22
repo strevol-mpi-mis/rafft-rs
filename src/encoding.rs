@@ -17,7 +17,7 @@
 //!
 //! where `AU`, `GC`, `GU` are weights of the base pairs.
 
-use ndarray::{arr1, s, Array1, Array2, ArrayView1, Axis, Ix1, Ix2};
+use ndarray::{arr1, s, Array1, Array2, ArrayView1, Axis};
 use std::convert::TryInto;
 use thiserror::Error;
 
