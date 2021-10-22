@@ -89,5 +89,16 @@ fn main() {
         .maximum_branches(opt.number_of_branches)
         .positional_lags(opt.positional_lags);
 
-    rafft_config.fold(&opt.sequence); //TODO: this method will need to be adjusted in the near future
+    let mut ffgraph = rafft_config.folding_graph(&opt.sequence);
+
+    ffgraph.construct_trajectories();
+
+    ffgraph.iter().for_each(|node| {
+        println!(
+            "[{}] {} {:.2}",
+            node.depth,
+            node.structure.to_string(),
+            node.energy as f64 * 0.01
+        );
+    });
 }

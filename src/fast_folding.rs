@@ -73,18 +73,14 @@ impl RafftConfig {
         self
     }
 
-    //TODO -> Should return a `RafftTree` or `RafftGraph` which can then be traversed
-    // IF my node information is Copy + Eq + Hash, I could use petgraph::GraphMap which would be nice
-    // So maybe instead of EncodedSequence I can just store information about endices, energy?
-    // if I store (n, mi, mj, mscore), I should store the indices adjusted to the complete sequences (see parent_indices)
-    // Otherwise I'd had to repeat all the steps
-    pub fn fold(&self, sequence: &str) {
+    /// Return an empty [`RafftGraph`] that can be used to construct fast folding trajectories.
+    pub fn folding_graph(&self, sequence: &str) -> RafftGraph {
         let fc = VCompound::new(sequence);
 
         let encoded = EncodedSequence::with_basepair_weights(sequence, &self.basepair_weights)
             .expect("Not a valid RNA Sequence!");
 
-        let mut ffgraph = RafftGraph::new(
+        RafftGraph::new(
             encoded,
             fc,
             self.min_unpaired,
@@ -92,18 +88,7 @@ impl RafftConfig {
             self.number_of_lags,
             self.number_of_branches,
             self.saved_trajectories,
-        );
-
-        ffgraph.construct_trajectories();
-
-        for node in ffgraph.inner.node_weights() {
-            println!(
-                "[{}] {} {:.2}",
-                node.depth,
-                node.structure.to_string(),
-                node.energy as f64 * 0.01
-            );
-        }
+        )
     }
 }
 
@@ -117,6 +102,17 @@ mod tests {
 
         let config = RafftConfig::new().maximum_trajectories(5);
 
-        config.fold(sequence);
+        let mut ffgraph = config.folding_graph(sequence);
+
+        ffgraph.construct_trajectories();
+
+        ffgraph.iter().for_each(|node| {
+            println!(
+                "[{}] {} {:.2}",
+                node.depth,
+                node.structure.to_string(),
+                node.energy as f64 * 0.01
+            );
+        });
     }
 }

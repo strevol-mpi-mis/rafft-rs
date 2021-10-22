@@ -127,6 +127,12 @@ impl RafftGraph {
         self.breadth_first_search(&current_nodes);
     }
 
+    /// Return an iterator over all structures represented as [`&RafftNodeInfo`] and
+    /// in insertion order (i.e. breadth-first and sorted by energy).
+    pub fn iter(&self) -> impl Iterator<Item = &RafftNodeInfo> + '_ {
+        self.inner.node_weights()
+    }
+
     /// Recursively construct the fast folding graph layer-per-layer.
     #[allow(clippy::type_complexity)]
     fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
@@ -226,8 +232,6 @@ impl RafftGraph {
 
         // TODO: not sure yet about the stop condition but I think the way I'm doing it,
         // TODO: new_nodes should be empty if no new structures were found
-
-        println!("{:?}", new_nodes);
 
         if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
