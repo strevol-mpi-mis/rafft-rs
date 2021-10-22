@@ -20,7 +20,7 @@ Alternatively, append `--features librna-sys/auto` to invocations of `cargo` if 
 
 ## Building
 
-**Note: Both CLI and bindings are not yet usable!**
+**Note: Python bindings are not yet usable!**
 
 To build the main CLI executable `rufft`, run
 
@@ -28,7 +28,7 @@ To build the main CLI executable `rufft`, run
 cargo build --release
 ```
 
-In addition, to build the dynamic library `librafft.so` containing `python` bindings, run
+To build the dynamic library `librafft.so` containing additional `python` bindings, run
 
 ```sh
 cargo build --release --features bindings
