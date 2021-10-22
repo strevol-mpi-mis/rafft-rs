@@ -155,7 +155,13 @@ impl RafftGraph {
                 self.inner[*structure_id]
                     .sub_nodes
                     .iter()
-                    .map(|encoded| self.create_children(encoded, energy, &pt))
+                    .filter_map(|encoded| {
+                        let children = self.create_children(encoded, energy, &pt);
+                        match children.len() {
+                            0 => None,
+                            _ => Some(children),
+                        }
+                    })
                     .collect::<Vec<_>>(),
             );
         }
