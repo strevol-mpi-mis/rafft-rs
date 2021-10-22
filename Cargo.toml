@@ -9,7 +9,7 @@ include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
 keywords = ["rna", "bioinformatics", "fft", "secondary-structure"]
 categories = ["science"]
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 itertools = "0.10"
