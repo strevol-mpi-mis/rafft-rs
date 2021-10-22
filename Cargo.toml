@@ -1,10 +1,8 @@
 [package]
 name = "rafft-rs"
-# TODO: order? I write this implementation but all the conceptual work has been done by Vaitea and Nono
-authors = ["Vincent Messow <vincent.messow@mis.mpg.de>", "Vaitea Opuu <>", "Nono S. C. Merleau <>"]
-repository = "https://github.com/strevol-mpi-mis/dmc-rs"
+authors = ["Vincent Messow <vincent.messow@mis.mpg.de>", "Vaitea Opuu <vaitea.opuu@mis.mpg.de>>", "Nono S. C. Merleau <cyrille.nono@mis.mpg.de>", "Matteo Smerlak <matteo.smerlak@mis.mpg.de>"]
+repository = "https://github.com/strevol-mpi-mis/rafft-rs"
 readme = "README.md"
-# TODO: licensing?
 license = "MIT"
 description = "RNA structure and folding dynamics prediction using fast Fourier transform."
 include = ["src/*", "Cargo.toml", "README.md", "COPYING"]
@@ -13,16 +11,13 @@ categories = ["science"]
 version = "0.1.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 itertools = "0.10"
-librna-sys = { version = "0.1" }#, optional = true }
+librna-sys = { version = "0.1" }
 #log = "0.4"
 ndarray = { version = "0.15", features = ["approx"] } # approx feature needed for tests but that can't be enabled separately & automatically yet
 petgraph = "0.6"
 pyo3 = { version = "0.14", features = ["extension-module", "abi3"], optional = true }
-#rustfft = "6.0"
 realfft = "2.0"
 structopt = "0.3"
 thiserror = "1.0"
@@ -32,7 +27,6 @@ approx = "0.4"
 
 [features]
 bindings = ["pyo3"]
-#rna = ["librna-sys"]
 
 [profile.release]
 opt-level = 3
@@ -51,4 +45,3 @@ crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "rufft"
-#required-features = ["rna"]
