@@ -1,3 +1,4 @@
+//! This module provides the core algorithm of RAFFT to construct fast folding graphs.
 use crate::encoding::{EncodedSequence, PairTable};
 use crate::vienna::VCompound;
 use itertools::Itertools;
@@ -20,7 +21,6 @@ pub struct RafftNodeInfo {
 }
 
 /// Fast-folding graph containing the folding trajectories and associated information.
-// TODO: do I need to handle inner  and outer fragments in the graph?
 pub struct RafftGraph {
     pub(crate) inner: DiGraph<RafftNodeInfo, ()>,
     node_table: HashMap<String, NodeIndex>,

@@ -1,5 +1,4 @@
-//! TODO: this extends the module encoding, so not sure if I need module-level documentation here
-
+//! This extends the module [`encoding`].
 use crate::encoding::EncodedSequence;
 use ndarray::Array1;
 use realfft::RealFftPlanner;
@@ -48,9 +47,10 @@ fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
 
 impl EncodedSequence {
     /// Compute the (auto)correlation of an [`EncodedSequence`] with its complementary strand representation using FFT.
-    /// TODO: Is there really a need for the `padding` parameter?
     /// A sane value for `padding` is `1.0`.
+    /// The `padding` parameter might be removed in the future.
     pub fn autocorrelation(&self, padding: f64) -> Array1<f64> {
+        // TODO: remove padding parameter
         assert!(padding > 0.0);
 
         let correlates = self

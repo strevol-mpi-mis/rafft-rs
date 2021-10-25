@@ -2,7 +2,6 @@
 #![warn(rustdoc::missing_crate_level_docs)]
 
 //! Rust implementation of [`RAFFT`](https://www.biorxiv.org/content/10.1101/2021.07.02.450908v1.full)
-//! TODO: crate level documentation
 
 /// Autocorrelation of an encoded RNA sequence using FFT
 #[allow(dead_code)]
@@ -19,7 +18,7 @@ pub mod fast_folding;
 /// A graph structure used be the RAFFT fast-folding algorithm.
 #[allow(dead_code)]
 pub mod folding_graph;
-/// Purpose-specific bindings for ViennaRNA
+/// Crate-specific bindings for ViennaRNA
 #[allow(dead_code)]
 mod vienna;
 
@@ -30,7 +29,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "bindings")]
 #[pymodule]
 fn librafft(py: Python, m: &PyModule) -> PyResult<()> {
-    /// TODO documentation and API
+    // TODO documentation and API
     #[pyfn(m)]
     fn set_temperature(temperature: f64) -> PyResult<()> {
         set_global_temperature(temperature);

@@ -1,3 +1,4 @@
+//! This module provides some limited functionality of ViennaRNA for use in RAFFT.
 use librna_sys::{
     vrna_alloc, vrna_eval_structure_pt, vrna_fold_compound, vrna_fold_compound_free,
     vrna_fold_compound_t, vrna_md_defaults_temperature, vrna_md_set_default, vrna_md_t,
@@ -8,6 +9,7 @@ use std::convert::TryInto;
 use std::ffi::CString;
 use std::path::PathBuf;
 
+/// A wrapper struct around `vrna_fold_compound_t` from ViennaRNA with limited functionality,
 pub struct VCompound {
     fc: *mut vrna_fold_compound_t,
     length: usize,

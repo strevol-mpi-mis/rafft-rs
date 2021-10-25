@@ -173,14 +173,11 @@ impl EncodedSequence {
         self.forward.is_empty()
     }
 
-    /// Get an copy-on-write slice of a subsequence (0-indexed).
+    /// Create a subsequence from an `EncodedSequence`.
+    /// Currently, this allocates new memory instead of slicing or some copy-on-write behaviour.
     /// The range defined by `start` and `end` is exclusive.
-    /// TODO: If `start >= end`, a contiguous [`EncodedSequence`] is newly created, with `start` as `5'` and `end-1` as `3'`.
-    // TODO: vaitea's RAFFT splits without wrapping around (which does not make a difference for pairing per se)
-    // TODO I think my approach is more intuitive but vaitea's might make it more easy later on?
-    // TODO Also: maybe I don't need to store the actual concatenation site
-    // TODO but the relative 5' site (could be negative) in my approach since this would be the only site where stacks shouldn't cross?
-    // TODO: need to store multiple concatenation sites!!!
+    /// If `start >= end`, a contiguous [`EncodedSequence`] is newly created, omitting the inner
+    /// region enclosed by both parameters.
     pub fn subsequence(&self, start: usize, end: usize) -> Self {
         if start < end {
             let sub_fwd = self.forward.slice(s![.., start..end]);
@@ -508,9 +505,6 @@ mod tests {
 
         let sub = encoded.subsequence(0, 5);
 
-        // TODO: These assertions are rather implementation-specific.
-        //assert!(sub.forward.is_view());
-        //assert!(sub.mirrored.is_view());
         assert_eq!(
             sub.forward,
             encoded.forward.slice(s![.., 0..5]) //CowArray::from(encoded.forward.slice(s![.., 0..5]))

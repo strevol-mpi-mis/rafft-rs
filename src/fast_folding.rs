@@ -1,6 +1,4 @@
-//! TODO: Brief description of RAFFT and data structures
-//! TODO: documentation
-//! TODO: Sanity checks on associated methods in impl RafftConfig
+//! This module provides `RafftConfig`, a convenient wrapper type to construct [`RafftGraph`]s.
 //! Note that energy parameters and temperature are set globally (available via CLI, crate root and python bindings)
 
 use crate::encoding::{BasePairWeights, EncodedSequence};
