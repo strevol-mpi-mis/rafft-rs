@@ -369,6 +369,11 @@ impl PairTable {
             .map(|(i, &u)| (i, u as usize))
     }
 
+    /// Return the number of pairs in the `PairTable`.
+    pub fn pairs(&self) -> usize {
+        self.paired().count()
+    }
+
     /// Insert a new pair into the [`PairTable`].
     /// Does not check for crossing pairs.
     /// Panics if supplied positions are out of range or inserting `i` or `j` would conflict with other pairs.

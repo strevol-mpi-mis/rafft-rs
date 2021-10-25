@@ -42,7 +42,7 @@ struct Opt {
     #[structopt(
         long = "minimum-helix-energy",
         short = "e",
-        help = "Minimum energy candidate helix stacks have to contribute; lower (negative) is more stable",
+        help = "Minimum energy [kcal/mol] candidate helix stacks have to contribute; lower (negative) is more stable",
         default_value = "0.0"
     )]
     min_loop_energy: f64,
@@ -67,6 +67,12 @@ struct Opt {
         default_value = "1"
     )]
     saved_trajectories: usize,
+    #[structopt(
+        long = "benchmark",
+        short = "B",
+        help = "Format output suitable for internal benchmarks"
+    )]
+    benchmark: bool,
 }
 
 fn main() {
@@ -93,12 +99,28 @@ fn main() {
 
     ffgraph.construct_trajectories();
 
-    ffgraph.iter().for_each(|node| {
-        println!(
-            "[{}] {} {:.2}",
-            node.depth,
-            node.structure.to_string(),
-            node.energy as f64 * 0.01
-        );
-    });
+    if !opt.benchmark {
+        ffgraph.iter().for_each(|node| {
+            println!(
+                "[{}] {} {:.2}",
+                node.depth,
+                node.structure.to_string(),
+                node.energy as f64 * 0.01
+            );
+        });
+    } else {
+        let mut trajectories: Vec<_> = ffgraph.iter().collect();
+        let trajectories = trajectories.split_off(trajectories.len() - opt.saved_trajectories);
+
+        trajectories.iter().for_each(|node| {
+            println!(
+                "{} {} {} {:.1} {}",
+                opt.sequence,
+                opt.sequence.len(),
+                node.structure.to_string(),
+                node.energy as f64 * 0.01,
+                node.structure.pairs()
+            );
+        });
+    }
 }
