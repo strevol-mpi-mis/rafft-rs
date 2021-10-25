@@ -4,7 +4,7 @@ Rust implementation of [RAFFT](https://github.com/strevol-mpi-mis/RAFFT), an alg
 
 ## Prerequisites
 
-- [`Rust`](https://rustup.rs/)
+- [`Rust`](https://www.rust-lang.org/tools/install)
 - [`ViennaRNA`](https://www.tbi.univie.ac.at/RNA/#download) including C header files
 
 If `ViennaRNA` is installed in a non-default location, e.g. by using [`bioconda`](https://bioconda.github.io/user/install.html),
@@ -17,6 +17,11 @@ export CPATH=$LIBRNA_INCLUDE_DIR
 ```
 
 Alternatively, append `--features librna-sys/auto` to invocations of `cargo` if `pkg-config --exists RNAlib2` returns successfully.
+
+### Example Setup
+
+If in doubt, please refer to [`Setup.md`](https://github.com/strevol-mpi-mis/rafft-rs/blob/main/Setup.md) for a reproducible *step-by-step* guide setting up 
+a working environment for building `rafft-rs`.
 
 ## Building
 
