@@ -1,11 +1,10 @@
 //! This module provides some limited functionality of ViennaRNA for use in RAFFT.
 use librna_sys::{
-    vrna_alloc, vrna_eval_structure_pt, vrna_fold_compound, vrna_fold_compound_free,
-    vrna_fold_compound_t, vrna_md_defaults_temperature, vrna_md_set_default, vrna_md_t,
-    vrna_params_load, VRNA_OPTION_EVAL_ONLY, VRNA_PARAMETER_FORMAT_DEFAULT,
+    vrna_eval_structure_pt, vrna_fold_compound, vrna_fold_compound_free, vrna_fold_compound_t,
+    vrna_md_defaults_temperature, vrna_md_t, vrna_params_load, VRNA_OPTION_EVAL_ONLY,
+    VRNA_PARAMETER_FORMAT_DEFAULT,
 };
 use ndarray::ArrayView1;
-use std::convert::TryInto;
 use std::ffi::CString;
 use std::path::PathBuf;
 
@@ -20,20 +19,9 @@ impl VCompound {
     pub fn new(sequence: &str) -> Self {
         let csequence = CString::new(sequence).expect("CString::new failed");
         let fc = unsafe {
-            let md: *mut vrna_md_t = vrna_alloc(
-                std::mem::size_of::<vrna_md_t>()
-                    .try_into()
-                    .expect("vrna_md_t allocation failed."),
-            ) as *mut vrna_md_t; // TODO: I think vrna_fold_compound_free() frees this
-            vrna_md_set_default(md);
+            let md = std::ptr::null::<vrna_md_t>();
 
-            // https://doc.rust-lang.org/std/primitive.pointer.html#method.as_ref
-            let _fc = vrna_fold_compound(
-                csequence.as_ptr(),
-                md.as_ref().unwrap(),
-                VRNA_OPTION_EVAL_ONLY,
-            );
-            _fc
+            vrna_fold_compound(csequence.as_ptr(), md, VRNA_OPTION_EVAL_ONLY)
         };
 
         Self {
