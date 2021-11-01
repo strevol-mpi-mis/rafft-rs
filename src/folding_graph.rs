@@ -35,7 +35,6 @@ pub struct RafftGraph {
 
 impl RafftGraph {
     /// Construct new graph containing only the root node
-    /// with `n` being the sequence length.
     pub fn new(
         root: EncodedSequence,
         fold_compound: VCompound,
@@ -253,7 +252,8 @@ impl RafftGraph {
         let mut corr = corr.iter().enumerate().collect::<Vec<_>>();
         corr.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap()); // swapping a and b saves me from using `corr.reverse();`
 
-        corr.iter()
+        let mut children: Vec<_> = corr
+            .iter()
             .take(self.number_of_lags)
             .filter_map(|(lag, _)| {
                 let (bp, mi, mj, _score) =
@@ -293,6 +293,11 @@ impl RafftGraph {
                     None
                 }
             })
-            .collect()
+            .collect();
+        // Usually, sorting children seems to be unnecessary
+        // but there are cases where it makes a difference.
+        children.sort_by_key(|child| child.3);
+
+        children
     }
 }
