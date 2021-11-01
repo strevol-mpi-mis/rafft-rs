@@ -101,7 +101,16 @@ impl RafftGraph {
         };
 
         let node_index = if let Some(index) = self.node_table.get(&structure_string) {
-            *index
+            // edge case where we want pre-existing structures re-inserted,
+            // namely, if they're the same as their parent
+            if parent == *index {
+                let idx = self.inner.add_node(info);
+                self.node_table.insert(structure_string, idx);
+
+                idx
+            } else {
+                *index
+            }
         } else {
             let index = self.inner.add_node(info);
             self.node_table.insert(structure_string, index);
@@ -235,26 +244,18 @@ impl RafftGraph {
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
 
-        let new_nodes: Vec<NodeIndex> = new_children
-            .into_iter()
-            .filter_map(|(parent, sub_nodes, pt, energy)| {
-                let id = self.insert(parent, sub_nodes, pt, energy);
+        // TODO: This stop condition is closer to the reference implmentation
+        // TODO: but this is rather expensive
+        if !nodes
+            .iter()
+            .map(|structure_id| self.inner[*structure_id].structure.to_string())
+            .eq(new_children.iter().map(|child| child.2.to_string()))
+        {
+            let new_nodes: Vec<NodeIndex> = new_children
+                .into_iter()
+                .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+                .collect();
 
-                // We added the previous nodes to new_children.
-                // However, to save some work, we only want to return "real" new children
-                // This .filter_map() does this
-                if id == parent {
-                    None
-                } else {
-                    Some(id)
-                }
-            })
-            .collect();
-
-        // TODO: not sure yet about the stop condition but I think the way I'm doing it,
-        // TODO: new_nodes should be empty if no new structures were found
-
-        if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
         }
     }
@@ -295,7 +296,6 @@ impl RafftGraph {
 
                     if (energy - reference_energy) as f64 * 0.01 < self.min_loop_energy {
                         let inner = if mj - mi > 1 {
-                            //self.min_unpaired { // > 1 in reference implementation
                             Some(parent_fragment.subsequence(mi + 1, mj))
                         } else {
                             None
