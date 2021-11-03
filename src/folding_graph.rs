@@ -185,10 +185,11 @@ impl RafftGraph {
         // unfortunately I seem to need this because I don't want to insert first and then remove unnecessary nodes?
         // in the reference implementation this gets passed down during recursion
         // but I think I can leave it locally for now
-        let mut seen: HashSet<String> = HashSet::new();
+        let mut seen: HashSet<String> = HashSet::with_capacity(self.number_of_branches);
 
         // parent, sub_nodes, structure, energy
-        let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> = vec![]; // Vec::with_capacity() would be better as soon as I know a good guess for the capacity
+        let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> =
+            Vec::with_capacity(self.number_of_branches + nodes.len());
 
         for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
             for combined_helix in node_children
