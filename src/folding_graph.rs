@@ -249,8 +249,8 @@ impl RafftGraph {
         // TODO: but this is rather expensive
         if !nodes
             .iter()
-            .map(|structure_id| self.inner[*structure_id].structure.to_string())
-            .eq(new_children.iter().map(|child| child.2.to_string()))
+            .map(|structure_id| self.inner[*structure_id].structure.view())
+            .eq(new_children.iter().map(|child| child.2.view()))
         {
             let new_nodes: Vec<NodeIndex> = new_children
                 .into_iter()

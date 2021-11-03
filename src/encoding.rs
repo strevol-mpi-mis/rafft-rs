@@ -330,7 +330,7 @@ impl EncodedSequence {
 ///
 /// Refer to the [upstream API](https://www.tbi.univie.ac.at/RNA/ViennaRNA/doc/html/group__struct__utils__pair__table.html) for details.
 // Why is Array1<i16> not Copy?
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PairTable(Array1<i16>);
 
 impl PairTable {
