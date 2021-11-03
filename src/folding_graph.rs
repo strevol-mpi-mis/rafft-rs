@@ -101,7 +101,16 @@ impl RafftGraph {
         };
 
         let node_index = if let Some(index) = self.node_table.get(&structure_string) {
-            *index
+            // edge case where we want pre-existing structures re-inserted,
+            // namely, if they're the same as their parent
+            if parent == *index {
+                let idx = self.inner.add_node(info);
+                self.node_table.insert(structure_string, idx);
+
+                idx
+            } else {
+                *index
+            }
         } else {
             let index = self.inner.add_node(info);
             self.node_table.insert(structure_string, index);
@@ -176,10 +185,11 @@ impl RafftGraph {
         // unfortunately I seem to need this because I don't want to insert first and then remove unnecessary nodes?
         // in the reference implementation this gets passed down during recursion
         // but I think I can leave it locally for now
-        let mut seen: HashSet<String> = HashSet::new();
+        let mut seen: HashSet<String> = HashSet::with_capacity(self.number_of_branches);
 
         // parent, sub_nodes, structure, energy
-        let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> = vec![]; // Vec::with_capacity() would be better as soon as I know a good guess for the capacity
+        let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> =
+            Vec::with_capacity(self.number_of_branches + nodes.len());
 
         for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
             for combined_helix in node_children
@@ -220,19 +230,33 @@ impl RafftGraph {
             }
         }
 
+        // The reference implementation carries _all_ the best structures till the end
+        // Therefore we're adding the previous nodes to the new children
+        for structure_id in nodes {
+            new_children.push((
+                *structure_id,
+                self.inner[*structure_id].sub_nodes.clone(), //vec![],
+                self.inner[*structure_id].structure.clone(),
+                self.inner[*structure_id].energy,
+            ));
+        }
+
         // sort by energy
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
 
-        let new_nodes: Vec<NodeIndex> = new_children
-            .into_iter()
-            .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
-            .collect();
+        // TODO: This stop condition is closer to the reference implmentation
+        // TODO: but this is rather expensive
+        if !nodes
+            .iter()
+            .map(|structure_id| self.inner[*structure_id].structure.to_string())
+            .eq(new_children.iter().map(|child| child.2.to_string()))
+        {
+            let new_nodes: Vec<NodeIndex> = new_children
+                .into_iter()
+                .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+                .collect();
 
-        // TODO: not sure yet about the stop condition but I think the way I'm doing it,
-        // TODO: new_nodes should be empty if no new structures were found
-
-        if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
         }
     }
@@ -273,7 +297,6 @@ impl RafftGraph {
 
                     if (energy - reference_energy) as f64 * 0.01 < self.min_loop_energy {
                         let inner = if mj - mi > 1 {
-                            //self.min_unpaired { // > 1 in reference implementation
                             Some(parent_fragment.subsequence(mi + 1, mj))
                         } else {
                             None

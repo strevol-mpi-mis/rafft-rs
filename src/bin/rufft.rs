@@ -109,18 +109,20 @@ fn main() {
             );
         });
     } else {
-        let mut trajectories: Vec<_> = ffgraph.iter().collect();
-        let trajectories = trajectories.split_off(trajectories.len() - opt.saved_trajectories);
+        let trajectories: Vec<_> = ffgraph.iter().collect();
+        let max_depth = trajectories[trajectories.len() - 1].depth;
 
         trajectories.iter().for_each(|node| {
-            println!(
-                "{} {} {} {:.1} {}",
-                opt.sequence,
-                opt.sequence.len(),
-                node.structure.to_string(),
-                node.energy as f64 * 0.01,
-                node.structure.pairs()
-            );
+            if node.depth == max_depth {
+                println!(
+                    "{} {} {} {:.1} {}",
+                    opt.sequence,
+                    opt.sequence.len(),
+                    node.structure.to_string(),
+                    node.energy as f64 * 0.01,
+                    node.structure.pairs()
+                );
+            }
         });
     }
 }
