@@ -132,6 +132,52 @@ impl RafftGraph {
         self.inner.node_weights()
     }
 
+    /// Return the (Metropolis) transition rates `r(i->j) = min(1, exp(-beta * (dGj - dGi)))` between each pair of connected structures,
+    /// with `beta = k * T`, where `k` is the Boltzmann constant and `T`the absolute temperature.
+    /// The output is in COO format and should work nicely with [`scipy.sparse.coo_matrix()`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html#scipy.sparse.coo_matrix).
+    /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
+    ///
+    /// Try `beta = 0.61`.
+    #[allow(non_snake_case)]
+    pub fn transition_rates(&self, beta: f64) -> (Vec<f64>, Vec<usize>, Vec<usize>) {
+        // TODO need to store diaganol entries such that rows sum to 0
+        let nnz = self.inner.edge_count() + self.inner.node_count();
+        let mut data: Vec<f64> = Vec::with_capacity(nnz);
+        let mut is: Vec<usize> = Vec::with_capacity(nnz);
+        let mut js: Vec<usize> = Vec::with_capacity(nnz);
+
+        // diagonal entries
+        for i in 0..self.inner.node_count() {
+            data.push(0.0);
+            is.push(i);
+            js.push(i);
+        }
+
+        for edge in self.inner.raw_edges() {
+            let dGi = self.inner[edge.source()].energy;
+            let dGj = self.inner[edge.target()].energy;
+
+            let ddG = (dGj - dGi) as f64;
+
+            let rate = 1.0f64.min((-beta * ddG).exp());
+            let rev_rate = 1.0f64.min((beta * ddG).exp());
+
+            data.push(rate);
+            is.push(edge.source().index());
+            js.push(edge.target().index());
+
+            data.push(rev_rate);
+            is.push(edge.target().index());
+            js.push(edge.source().index());
+
+            // diagonal entries
+            data[edge.source().index()] -= rate;
+            data[edge.target().index()] -= rev_rate;
+        }
+
+        (data, is, js)
+    }
+
     /// Recursively construct the fast folding graph layer-per-layer.
     #[allow(clippy::type_complexity)]
     fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
