@@ -101,16 +101,7 @@ impl RafftGraph {
         };
 
         let node_index = if let Some(index) = self.node_table.get(&structure_string) {
-            // edge case where we want pre-existing structures re-inserted,
-            // namely, if they're the same as their parent
-            if parent == *index {
-                let idx = self.inner.add_node(info);
-                self.node_table.insert(structure_string, idx);
-
-                idx
-            } else {
-                *index
-            }
+            *index
         } else {
             let index = self.inner.add_node(info);
             self.node_table.insert(structure_string, index);
@@ -189,7 +180,7 @@ impl RafftGraph {
 
         // parent, sub_nodes, structure, energy
         let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> =
-            Vec::with_capacity(self.number_of_branches + nodes.len());
+            Vec::with_capacity(self.number_of_branches);
 
         for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
             for combined_helix in node_children
@@ -230,7 +221,7 @@ impl RafftGraph {
             }
         }
 
-        // The reference implementation carries _all_ the best structures till the end
+        /*// The reference implementation carries _all_ the best structures till the end
         // Therefore we're adding the previous nodes to the new children
         for structure_id in nodes {
             new_children.push((
@@ -239,24 +230,35 @@ impl RafftGraph {
                 self.inner[*structure_id].structure.clone(),
                 self.inner[*structure_id].energy,
             ));
-        }
+        }*/
 
         // sort by energy
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
 
-        // TODO: This stop condition is closer to the reference implmentation
-        // TODO: but this is rather expensive
-        if !nodes
-            .iter()
-            .map(|structure_id| self.inner[*structure_id].structure.view())
-            .eq(new_children.iter().map(|child| child.2.view()))
-        {
-            let new_nodes: Vec<NodeIndex> = new_children
-                .into_iter()
-                .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
-                .collect();
+        let new_nodes: Vec<NodeIndex> = new_children
+            .into_iter()
+            .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+            /*.filter_map(|(parent, sub_nodes, pt, energy)| {
+                let id = self.insert(parent, sub_nodes, pt, energy);
+                // We added the previous nodes to new_children.
+                // However, to save some work, we only want to return "real" new children
+                // This .filter_map() does this
+                if id == parent {
+                    None
+                } else {
+                    Some(id)
+                }
+            })*/
+            .collect();
 
+        /*let l1 = new_nodes.len();
+        // TODO: I think this might have some effect
+        new_nodes.sort();
+        new_nodes.dedup();
+        assert_eq!(l1, new_nodes.len());*/
+
+        if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
         }
     }
