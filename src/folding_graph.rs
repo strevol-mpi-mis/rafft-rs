@@ -133,8 +133,8 @@ impl RafftGraph {
     }
 
     /// Return the (Metropolis) transition rates `r(i->j) = min(1, exp(-beta * (dGj - dGi)))` between each pair of connected structures,
-    /// with `beta = k * T`, where `k` is the Boltzmann constant and `T`the absolute temperature.
-    /// The output is in COO format and should work nicely with [`scipy.sparse.coo_matrix()`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html#scipy.sparse.coo_matrix).
+    /// with `beta = k * T`, where `k` is the Boltzmann constant and `T` the absolute temperature.
+    /// The output is in COO format (`(r, i, j)`) and should work nicely with [`scipy.sparse.coo_matrix()`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html#scipy.sparse.coo_matrix).
     /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
     ///
     /// Try `beta = 0.61`.
@@ -179,6 +179,10 @@ impl RafftGraph {
     }
 
     /// Recursively construct the fast folding graph layer-per-layer.
+    ///
+    /// _Implementation Detail_: This does not need to be done recursively. In fact, this
+    /// implementation is easily translated into an iterative style as the underlying `Vec`-backed
+    /// graph structure is not closely tied to the algorithm.
     #[allow(clippy::type_complexity)]
     fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
         // Using iterators nested in a for-loop because
@@ -267,17 +271,6 @@ impl RafftGraph {
             }
         }
 
-        /*// The reference implementation carries _all_ the best structures till the end
-        // Therefore we're adding the previous nodes to the new children
-        for structure_id in nodes {
-            new_children.push((
-                *structure_id,
-                self.inner[*structure_id].sub_nodes.clone(), //vec![],
-                self.inner[*structure_id].structure.clone(),
-                self.inner[*structure_id].energy,
-            ));
-        }*/
-
         // sort by energy
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
@@ -285,24 +278,7 @@ impl RafftGraph {
         let new_nodes: Vec<NodeIndex> = new_children
             .into_iter()
             .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
-            /*.filter_map(|(parent, sub_nodes, pt, energy)| {
-                let id = self.insert(parent, sub_nodes, pt, energy);
-                // We added the previous nodes to new_children.
-                // However, to save some work, we only want to return "real" new children
-                // This .filter_map() does this
-                if id == parent {
-                    None
-                } else {
-                    Some(id)
-                }
-            })*/
             .collect();
-
-        /*let l1 = new_nodes.len();
-        // TODO: I think this might have some effect
-        new_nodes.sort();
-        new_nodes.dedup();
-        assert_eq!(l1, new_nodes.len());*/
 
         if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
