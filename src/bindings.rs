@@ -68,4 +68,14 @@ impl FastFoldingGraph {
 
         Ok(trajectories)
     }
+
+    #[args(beta = "0.61")]
+    fn transition_rates(&self, beta: f64) -> PyResult<(Vec<f64>, Vec<usize>, Vec<usize>)> {
+        Ok(self.inner.transition_rates(beta))
+    }
+
+    fn directed_edges(&self) -> PyResult<(Vec<usize>, Vec<usize>)> {
+        let (is, js): (Vec<_>, Vec<_>) = self.inner.adjacent_indices().unzip();
+        Ok((is, js))
+    }
 }

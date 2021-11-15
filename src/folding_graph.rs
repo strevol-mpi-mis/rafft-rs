@@ -101,16 +101,7 @@ impl RafftGraph {
         };
 
         let node_index = if let Some(index) = self.node_table.get(&structure_string) {
-            // edge case where we want pre-existing structures re-inserted,
-            // namely, if they're the same as their parent
-            if parent == *index {
-                let idx = self.inner.add_node(info);
-                self.node_table.insert(structure_string, idx);
-
-                idx
-            } else {
-                *index
-            }
+            *index
         } else {
             let index = self.inner.add_node(info);
             self.node_table.insert(structure_string, index);
@@ -141,7 +132,68 @@ impl RafftGraph {
         self.inner.node_weights()
     }
 
+    /// Return the (Metropolis) transition rates `r(i->j) = min(1, exp(-beta * (dGj - dGi)))` between each pair of connected structures,
+    /// with `beta = k * T`, where `k` is the Boltzmann constant and `T` the absolute temperature.
+    /// The output is in COO format (`(r, i, j)`) and should work nicely with [`scipy.sparse.coo_matrix()`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html#scipy.sparse.coo_matrix).
+    /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
+    ///
+    /// Try `beta = 0.61`.
+    #[allow(non_snake_case)]
+    pub fn transition_rates(&self, beta: f64) -> (Vec<f64>, Vec<usize>, Vec<usize>) {
+        // TODO need to store diaganol entries such that rows sum to 0
+        let nnz = self.inner.edge_count() + self.inner.node_count();
+        let mut data: Vec<f64> = Vec::with_capacity(nnz);
+        let mut is: Vec<usize> = Vec::with_capacity(nnz);
+        let mut js: Vec<usize> = Vec::with_capacity(nnz);
+
+        // diagonal entries
+        for i in 0..self.inner.node_count() {
+            data.push(0.0);
+            is.push(i);
+            js.push(i);
+        }
+
+        for edge in self.inner.raw_edges() {
+            let dGi = self.inner[edge.source()].energy;
+            let dGj = self.inner[edge.target()].energy;
+
+            let ddG = (dGj - dGi) as f64;
+
+            let rate = 1.0f64.min((-beta * ddG).exp());
+            let rev_rate = 1.0f64.min((beta * ddG).exp());
+
+            data.push(rate);
+            is.push(edge.source().index());
+            js.push(edge.target().index());
+
+            data.push(rev_rate);
+            is.push(edge.target().index());
+            js.push(edge.source().index());
+
+            // diagonal entries
+            data[edge.source().index()] -= rate;
+            data[edge.target().index()] -= rev_rate;
+        }
+
+        (data, is, js)
+    }
+
+    /// Return the directed edges `(i, j)` of the fast folding graph, where `i`, `j` are
+    /// the indices of the participating structures.
+    /// This is the sparse COO format with empty weights.
+    /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
+    pub fn adjacent_indices(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.inner
+            .raw_edges()
+            .iter()
+            .map(|edge| (edge.source().index(), edge.target().index()))
+    }
+
     /// Recursively construct the fast folding graph layer-per-layer.
+    ///
+    /// _Implementation Detail_: This does not need to be done recursively. In fact, this
+    /// implementation is easily translated into an iterative style as the underlying `Vec`-backed
+    /// graph structure is not closely tied to the algorithm.
     #[allow(clippy::type_complexity)]
     fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
         // Using iterators nested in a for-loop because
@@ -189,7 +241,7 @@ impl RafftGraph {
 
         // parent, sub_nodes, structure, energy
         let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> =
-            Vec::with_capacity(self.number_of_branches + nodes.len());
+            Vec::with_capacity(self.number_of_branches);
 
         for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
             for combined_helix in node_children
@@ -230,33 +282,16 @@ impl RafftGraph {
             }
         }
 
-        // The reference implementation carries _all_ the best structures till the end
-        // Therefore we're adding the previous nodes to the new children
-        for structure_id in nodes {
-            new_children.push((
-                *structure_id,
-                self.inner[*structure_id].sub_nodes.clone(), //vec![],
-                self.inner[*structure_id].structure.clone(),
-                self.inner[*structure_id].energy,
-            ));
-        }
-
         // sort by energy
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
 
-        // TODO: This stop condition is closer to the reference implmentation
-        // TODO: but this is rather expensive
-        if !nodes
-            .iter()
-            .map(|structure_id| self.inner[*structure_id].structure.view())
-            .eq(new_children.iter().map(|child| child.2.view()))
-        {
-            let new_nodes: Vec<NodeIndex> = new_children
-                .into_iter()
-                .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
-                .collect();
+        let new_nodes: Vec<NodeIndex> = new_children
+            .into_iter()
+            .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+            .collect();
 
+        if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
         }
     }

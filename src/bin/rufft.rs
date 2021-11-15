@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -73,6 +74,13 @@ struct Opt {
         help = "Format output suitable for internal benchmarks"
     )]
     benchmark: bool,
+    #[structopt(
+        parse(from_os_str),
+        long = "output-edges",
+        short = "o",
+        help = "Write edges (pairs of structure indices) to the specified file. The indices correspond to the order of the printed structures."
+    )]
+    outfile: Option<PathBuf>,
 }
 
 fn main() {
@@ -108,21 +116,28 @@ fn main() {
                 node.energy as f64 * 0.01
             );
         });
-    } else {
-        let trajectories: Vec<_> = ffgraph.iter().collect();
-        let max_depth = trajectories[trajectories.len() - 1].depth;
 
-        trajectories.iter().for_each(|node| {
-            if node.depth == max_depth {
-                println!(
-                    "{} {} {} {:.1} {}",
-                    opt.sequence,
-                    opt.sequence.len(),
-                    node.structure.to_string(),
-                    node.energy as f64 * 0.01,
-                    node.structure.pairs()
-                );
+        if let Some(outfile) = opt.outfile {
+            if let Ok(mut file) = std::fs::File::create(&outfile) {
+                ffgraph.adjacent_indices().for_each(|(i, j)| {
+                    writeln!(file, "{} {}", i, j).unwrap();
+                })
             }
-        });
+        }
+    } else {
+        let mut trajectories: Vec<_> = ffgraph.iter().collect();
+
+        trajectories.sort_by_key(|node| node.energy);
+
+        for node in &trajectories[..opt.saved_trajectories.min(trajectories.len())] {
+            println!(
+                "{} {} {} {:.1} {}",
+                opt.sequence,
+                opt.sequence.len(),
+                node.structure.to_string(),
+                node.energy as f64 * 0.01,
+                node.structure.pairs()
+            );
+        }
     }
 }

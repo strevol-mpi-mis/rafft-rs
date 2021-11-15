@@ -60,4 +60,13 @@ from librafft import FastFoldingGraph, set_temperature, set_energy_parameters
 # min_loop_energy = 0.0
 ffgraph = FastFoldingGraph("GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU")
 print(ffgraph.trajectories())
+
+# Afterwards, obtain Metropolis transition rates:
+from scipy.sparse import coo_matrix
+
+# with optional parameter beta = 0.61
+rates, i_s, j_s = ffgraph.transition_rates()
+trmatrix = coo_matrix((rates, (i_s, j_s))).toarray() # or .tocsr()
+# see also
+#ffgraph.directed_edges()
 ```
