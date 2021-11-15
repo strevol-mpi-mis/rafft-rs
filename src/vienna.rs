@@ -2,7 +2,7 @@
 use librna_sys::{
     vrna_eval_structure_pt, vrna_fold_compound, vrna_fold_compound_free, vrna_fold_compound_t,
     vrna_md_defaults_temperature, vrna_md_t, vrna_params_load, VRNA_OPTION_EVAL_ONLY,
-    VRNA_PARAMETER_FORMAT_DEFAULT,
+    VRNA_PARAMETER_FORMAT_DEFAULT, VRNA_VERSION,
 };
 use ndarray::ArrayView1;
 use std::ffi::CString;
@@ -82,6 +82,10 @@ pub fn set_global_energy_parameters(parameters: PathBuf) {
         vrna_params_load(cparams.as_ptr(), VRNA_PARAMETER_FORMAT_DEFAULT);
     }
 }
+
+/// Return the version string of the statically linked `ViennaRNA` library.
+// Safety: the version string of ViennaRNA should always be valid Unicode
+pub const VIENNA_VERSION: &str = unsafe { std::str::from_utf8_unchecked(VRNA_VERSION) };
 
 #[cfg(test)]
 mod tests {

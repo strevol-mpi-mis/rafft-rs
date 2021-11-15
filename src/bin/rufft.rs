@@ -3,12 +3,13 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use rafft::fast_folding::RafftConfig;
-use rafft::{set_global_energy_parameters, set_global_temperature};
+use rafft::{set_global_energy_parameters, set_global_temperature, VIENNA_VERSION};
 
 #[derive(StructOpt, Debug)]
 #[structopt(
     name = "rufft",
-    about = "RAFFT implemented in Rust. RNA structure and folding dynamics prediction using fast Fourier transform."
+    about = "RAFFT implemented in Rust. RNA structure and folding dynamics prediction using fast Fourier transform.",
+    after_help(VIENNA_VERSION)
 )]
 struct Opt {
     #[structopt(

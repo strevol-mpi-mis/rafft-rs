@@ -22,7 +22,7 @@ pub mod folding_graph;
 #[allow(dead_code)]
 mod vienna;
 
-pub use vienna::{set_global_energy_parameters, set_global_temperature};
+pub use vienna::{set_global_energy_parameters, set_global_temperature, VIENNA_VERSION};
 
 #[cfg(feature = "bindings")]
 use pyo3::prelude::*;
@@ -40,6 +40,11 @@ fn librafft(py: Python, m: &PyModule) -> PyResult<()> {
     fn set_energy_parameters(parameters: &str) -> PyResult<()> {
         set_global_energy_parameters(std::path::PathBuf::from(parameters));
         Ok(())
+    }
+
+    #[pyfn(m)]
+    fn vienna_version() -> PyResult<String> {
+        Ok(VIENNA_VERSION.to_string())
     }
 
     bindings::register(py, m)?;
