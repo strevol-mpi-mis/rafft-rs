@@ -178,6 +178,17 @@ impl RafftGraph {
         (data, is, js)
     }
 
+    /// Return the directed edges `(i, j)` of the fast folding graph, where `i`, `j` are
+    /// the indices of the participating structures.
+    /// This is the sparse COO format with empty weights.
+    /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
+    pub fn adjacent_indices(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.inner
+            .raw_edges()
+            .iter()
+            .map(|edge| (edge.source().index(), edge.target().index()))
+    }
+
     /// Recursively construct the fast folding graph layer-per-layer.
     ///
     /// _Implementation Detail_: This does not need to be done recursively. In fact, this

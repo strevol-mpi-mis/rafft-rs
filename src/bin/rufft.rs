@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -73,6 +74,13 @@ struct Opt {
         help = "Format output suitable for internal benchmarks"
     )]
     benchmark: bool,
+    #[structopt(
+        parse(from_os_str),
+        long = "output-edges",
+        short = "o",
+        help = "Write edges (pairs of structure indices) to the specified file. The indices correspond to the order of the printed structures."
+    )]
+    outfile: Option<PathBuf>,
 }
 
 fn main() {
@@ -108,6 +116,14 @@ fn main() {
                 node.energy as f64 * 0.01
             );
         });
+
+        if let Some(outfile) = opt.outfile {
+            if let Ok(mut file) = std::fs::File::create(&outfile) {
+                ffgraph.adjacent_indices().for_each(|(i, j)| {
+                    writeln!(file, "{} {}", i, j).unwrap();
+                })
+            }
+        }
     } else {
         let mut trajectories: Vec<_> = ffgraph.iter().collect();
 
