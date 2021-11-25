@@ -76,6 +76,12 @@ struct Opt {
     )]
     benchmark: bool,
     #[structopt(
+        long = "stochastic",
+        short = "S",
+        help = "Construct folding trajectories stochastically"
+    )]
+    stochastic: bool,
+    #[structopt(
         parse(from_os_str),
         long = "output-edges",
         short = "o",
@@ -106,7 +112,11 @@ fn main() {
 
     let mut ffgraph = rafft_config.folding_graph(&opt.sequence);
 
-    ffgraph.construct_trajectories();
+    if opt.stochastic {
+        ffgraph.construct_stochastic_trajectories();
+    } else {
+        ffgraph.construct_trajectories();
+    }
 
     if !opt.benchmark {
         ffgraph.iter().for_each(|node| {

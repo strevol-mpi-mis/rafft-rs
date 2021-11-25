@@ -2,7 +2,8 @@
 use crate::encoding::{EncodedSequence, PairTable};
 use crate::vienna::VCompound;
 use itertools::Itertools;
-use petgraph::graph::DiGraph;
+use petgraph::{graph::DiGraph, Direction::Incoming};
+use rand::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 pub use petgraph::graph::NodeIndex;
@@ -126,6 +127,12 @@ impl RafftGraph {
         self.breadth_first_search(&current_nodes);
     }
 
+    /// Construct stochastic folding trajectories.
+    pub fn construct_stochastic_trajectories(&mut self) {
+        let current_nodes = vec![self.root()];
+        self.stochastic_search(&current_nodes);
+    }
+
     /// Return an iterator over all structures represented as [`&RafftNodeInfo`] and
     /// in insertion order (i.e. breadth-first and sorted by energy).
     pub fn iter(&self) -> impl Iterator<Item = &RafftNodeInfo> + '_ {
@@ -189,13 +196,11 @@ impl RafftGraph {
             .map(|edge| (edge.source().index(), edge.target().index()))
     }
 
-    /// Recursively construct the fast folding graph layer-per-layer.
-    ///
-    /// _Implementation Detail_: This does not need to be done recursively. In fact, this
-    /// implementation is easily translated into an iterative style as the underlying `Vec`-backed
-    /// graph structure is not closely tied to the algorithm.
     #[allow(clippy::type_complexity)]
-    fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
+    fn search_step(
+        &mut self,
+        nodes: &[NodeIndex],
+    ) -> Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> {
         // Using iterators nested in a for-loop because
         // nested iterators and borrowing still is elusive to me.
         // Also, triple-nested Vec is probably not very efficient
@@ -217,19 +222,24 @@ impl RafftGraph {
             let energy = self.inner[*structure_id].energy;
             let pt = self.inner[*structure_id].structure.clone();
 
-            all_children.push(
-                self.inner[*structure_id]
-                    .sub_nodes
-                    .iter()
-                    .filter_map(|encoded| {
-                        let children = self.create_children(encoded, energy, &pt);
-                        match children.len() {
-                            0 => None,
-                            _ => Some(children),
-                        }
-                    })
-                    .collect::<Vec<_>>(),
-            );
+            // we don't need to push any children if structure_id represents an inner node
+            if self.inner.edges(*structure_id).next().is_some() {
+                all_children.push(vec![]);
+            } else {
+                all_children.push(
+                    self.inner[*structure_id]
+                        .sub_nodes
+                        .iter()
+                        .filter_map(|encoded| {
+                            let children = self.create_children(encoded, energy, &pt);
+                            match children.len() {
+                                0 => None,
+                                _ => Some(children),
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                );
+            }
         }
 
         let mut i_branch = 0;
@@ -244,43 +254,72 @@ impl RafftGraph {
             Vec::with_capacity(self.number_of_branches);
 
         for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
-            for combined_helix in node_children
-                .iter()
-                .map(|inner| inner.iter())
-                .multi_cartesian_product()
-            {
-                let mut sub_nodes: Vec<EncodedSequence> = vec![];
-                let mut pt = PairTable::new(self.fc.len());
+            // if node structure_id has outgoing edges
+            // populate new_children with existing children of this node instead
+            if self.inner.edges(*structure_id).next().is_some() {
+                for child_id in self.inner.neighbors(*structure_id) {
+                    let sub_nodes = self.inner[child_id].sub_nodes.clone();
+                    let pt = self.inner[child_id].structure.clone();
+                    let energy = self.inner[child_id].energy;
 
-                for helix_part in combined_helix {
-                    helix_part
-                        .2
-                        .paired()
-                        .for_each(|(i, j)| pt.insert(i as i16, j as i16));
+                    new_children.push((*structure_id, sub_nodes, pt, energy));
 
-                    if let Some(inner) = &helix_part.0 {
-                        sub_nodes.push(inner.clone());
-                    }
-
-                    if let Some(outer) = &helix_part.1 {
-                        sub_nodes.push(outer.clone());
-                    }
-                }
-
-                let structure_string = pt.to_string();
-
-                if !self.contains(&structure_string) && seen.insert(structure_string) {
                     i_branch += 1;
 
-                    let energy = self.fc.evaluate_structure(pt.view());
-                    new_children.push((*structure_id, sub_nodes, pt, energy));
+                    if i_branch >= self.number_of_branches {
+                        break;
+                    }
                 }
+            } else {
+                for combined_helix in node_children
+                    .iter()
+                    .map(|inner| inner.iter())
+                    .multi_cartesian_product()
+                {
+                    let mut sub_nodes: Vec<EncodedSequence> = vec![];
+                    let mut pt = PairTable::new(self.fc.len());
 
-                if i_branch >= self.number_of_branches {
-                    break;
+                    for helix_part in combined_helix {
+                        helix_part
+                            .2
+                            .paired()
+                            .for_each(|(i, j)| pt.insert(i as i16, j as i16));
+
+                        if let Some(inner) = &helix_part.0 {
+                            sub_nodes.push(inner.clone());
+                        }
+
+                        if let Some(outer) = &helix_part.1 {
+                            sub_nodes.push(outer.clone());
+                        }
+                    }
+
+                    let structure_string = pt.to_string();
+
+                    if !self.contains(&structure_string) && seen.insert(structure_string) {
+                        i_branch += 1;
+
+                        let energy = self.fc.evaluate_structure(pt.view());
+                        new_children.push((*structure_id, sub_nodes, pt, energy));
+                    }
+
+                    if i_branch >= self.number_of_branches {
+                        break;
+                    }
                 }
             }
         }
+
+        new_children
+    }
+
+    /// Recursively construct the fast folding graph layer-per-layer.
+    ///
+    /// _Implementation Detail_: This does not need to be done recursively. In fact, this
+    /// implementation is easily translated into an iterative style as the underlying `Vec`-backed
+    /// graph structure is not closely tied to the algorithm.
+    fn breadth_first_search(&mut self, nodes: &[NodeIndex]) {
+        let mut new_children = self.search_step(nodes);
 
         // sort by energy
         new_children.sort_by_key(|child| child.3);
@@ -293,6 +332,53 @@ impl RafftGraph {
 
         if !new_nodes.is_empty() {
             self.breadth_first_search(&new_nodes);
+        }
+    }
+    /// Stochastically construct the fast folding graph.
+    /// This differs from [`breadth_first_search`] by randomly choosing (weighted by `exp(-energy)`)
+    /// from the new children as well as current nodes and parent nodes,
+    /// i.e. staying and moving backwards is possible.
+    fn stochastic_search(&mut self, nodes: &[NodeIndex]) {
+        let mut new_children = self.search_step(nodes);
+
+        // TODO: This stop condition fails easily
+        // could instead check whether all current nodes are at depth < max_depth
+        if !new_children.is_empty() {
+            // if I allocate a Vec from nodes, I don't need to pass them by reference...
+            let mut parents = nodes.to_vec();
+
+            for node_id in nodes {
+                for p in self.inner.neighbors_directed(*node_id, Incoming) {
+                    parents.push(p);
+                }
+            }
+
+            parents.sort();
+            parents.dedup();
+
+            for id in parents {
+                new_children.push((id, vec![], PairTable::new(0), self.inner[id].energy));
+            }
+
+            let mut rng = thread_rng();
+
+            let new_nodes: Vec<NodeIndex> = new_children
+                .choose_multiple_weighted(
+                    &mut rng,
+                    self.saved_trajectories.min(new_children.len()),
+                    |child| (-child.3 as f64).exp(),
+                )
+                .unwrap()
+                .map(|(node, sub_nodes, pt, energy)| {
+                    if pt.is_empty() {
+                        *node
+                    } else {
+                        self.insert(*node, sub_nodes.clone(), pt.clone(), *energy)
+                    }
+                })
+                .collect();
+
+            self.stochastic_search(&new_nodes);
         }
     }
 
