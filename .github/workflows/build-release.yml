@@ -11,8 +11,10 @@ jobs:
     runs-on: [ubuntu-latest]
     needs: setup-build-env
     env:
-      CPATH: ${{ needs.setup-build-env.outputs.cpath }}
+      CPATH: ${{ needs.setup-build-env.outputs.conda_prefix }}/include
+      LIBRNA_INCLUDE_DIR: ${{ needs.setup-build-env.outputs.conda_prefix }}/include
+      LIBRNA_LIB_DIR: ${{ needs.setup-build-env.outputs.conda_prefix }}/lib
     
     steps:
       - uses: actions/checkout@v2
-      - run: cargo build --features librna-sys/auto --release
+      - run: cargo build --features bindings --release

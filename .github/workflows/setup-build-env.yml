@@ -2,16 +2,16 @@ name: Setup build environment
 on:
   workflow_call:
     outputs:
-      cpath:
+      conda_prefix:
         description: "The C header file directory of the created conda environment"
-        value: ${{ jobs.install-viennarna.outputs.cpath }}
+        value: ${{ jobs.install-viennarna.outputs.conda_prefix }}
   
 jobs:
   install-viennarna:
     name: Install ViennaRNA
     runs-on: [ubuntu-latest]
     outputs:
-      cpath: ${{ steps.out.outputs.cpath }}
+      conda_prefix: ${{ steps.out.outputs.cprefix }}
     steps:
       - uses: actions/checkout@v2
       - name: Cache conda packages
@@ -29,4 +29,4 @@ jobs:
           use-only-tar-bz2: true
       - id: out
         shell: bash -l {0}
-        run: echo "::set-output name=cpath::$CONDA_PREFIX/include"
+        run: echo "::set-output name=cprefix::$CONDA_PREFIX"
