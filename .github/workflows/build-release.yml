@@ -8,7 +8,7 @@ jobs:
     uses: strevol-mpi-mis/rafft-rs/.github/workflows/setup-build-env.yml@main
     
   build:
-    runs-on: [ubuntu-latest, macos-latest]
+    runs-on: [ubuntu-latest]
     needs: setup-build-env
     env:
       CPATH: ${{ needs.setup-build-env.outputs.cpath }}

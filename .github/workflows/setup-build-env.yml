@@ -9,7 +9,7 @@ on:
 jobs:
   install-viennarna:
     name: Install ViennaRNA
-    runs-on: [ubuntu-latest, macos-latest]
+    runs-on: [ubuntu-latest]
     outputs:
       cpath: $${{ steps.out.outputs.cpath }}
     steps:
