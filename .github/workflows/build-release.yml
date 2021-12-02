@@ -14,4 +14,5 @@ jobs:
       CPATH: ${{ needs.setup-build-env.outputs.cpath }}
     
     steps:
+      - uses: actions/checkout@v2
       - run: cargo build --features librna-sys/auto --release
