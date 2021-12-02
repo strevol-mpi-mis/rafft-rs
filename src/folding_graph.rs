@@ -338,7 +338,7 @@ impl RafftGraph {
                         };
 
                         let outer = if mi + 1 > bp || mj + bp < parent_fragment.len() {
-                            Some(parent_fragment.subsequence(mj + bp, mi - bp + 1))
+                            Some(parent_fragment.subsequence(mj + bp, mi + 1 - bp))
                         } else {
                             None
                         };
