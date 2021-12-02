@@ -1,0 +1,49 @@
+name: Build release artifacts
+on:
+  release:
+    types: [published, created, edited]
+
+jobs:
+  build:
+    runs-on: [ubuntu-latest]
+    
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up and cache conda environment including ViennaRNA
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/build_env.yml') }}
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: buildrafft
+          channel-priority: strict
+          environment-file: .github/build_env.yml
+          use-only-tar-bz2: true
+      - id: env_vars
+        shell: bash -l {0}
+        run: |
+          echo "CPATH=$CONDA_PREFIX/include" >> $GITHUB_ENV
+          echo "LIBRNA_INCLUDE_DIR=$CONDA_PREFIX/include" >> $GITHUB_ENV
+          echo "LIBRNA_LIB_DIR=$CONDA_PREFIX/lib" >> $GITHUB_ENV
+      - name: Cache cargo dependencies
+        uses: actions/cache@v2
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ env.CACHE_NUMBER }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build stripped release binaries
+        shell: bash -l {0}
+        run: |
+          cargo build --features bindings --release
+          cargo test --features bindings --release
+          strip target/release/librafft.so
+          strip target/release/rufft

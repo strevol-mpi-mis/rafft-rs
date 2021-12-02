@@ -1,0 +1,8 @@
+name: buildrafft
+channels:
+  - conda-forge
+  - bioconda
+  - default
+  - defaults
+dependencies:
+  - viennarna=2.4.18
