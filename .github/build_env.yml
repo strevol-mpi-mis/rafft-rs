@@ -1,0 +1,6 @@
+name: buildrafft
+channels:
+  - bioconda
+dependencies:
+  - pkg-config=0.29.2
+  - viennarna=2.4.18

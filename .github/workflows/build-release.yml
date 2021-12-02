@@ -1,0 +1,17 @@
+name: Build release artifact
+on:
+  release:
+    types: [published, created, edited]
+
+jobs:
+  setup-build-env:
+    uses: strevol-mpi-mis/rafft-rs/.github/workflows/setup-build-env.yml@main
+    
+  build:
+    runs-on: [ubuntu-latest, macos-latest]
+    needs: setup-build-env
+    env:
+      CPATH: ${{ needs.setup-build-env.outputs.cpath }}
+    
+    steps:
+      - run: cargo build --features librna-sys/auto --release
