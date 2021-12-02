@@ -11,7 +11,7 @@ jobs:
     name: Install ViennaRNA
     runs-on: [ubuntu-latest]
     outputs:
-      cpath: $${{ steps.out.outputs.cpath }}
+      cpath: ${{ steps.out.outputs.cpath }}
     steps:
       - uses: actions/checkout@v2
       - name: Cache conda packages
