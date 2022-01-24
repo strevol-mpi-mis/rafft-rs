@@ -126,7 +126,7 @@ impl RafftGraph {
         self.breadth_first_search(&current_nodes);
     }
 
-    /// Return an iterator over all structures represented as [`&RafftNodeInfo`] and
+    /// Return an iterator over all structures represented as references to [`RafftNodeInfo`] and
     /// in insertion order (i.e. breadth-first and sorted by energy).
     pub fn iter(&self) -> impl Iterator<Item = &RafftNodeInfo> + '_ {
         self.inner.node_weights()
@@ -135,7 +135,7 @@ impl RafftGraph {
     /// Return the (Metropolis) transition rates `r(i->j) = min(1, exp(-beta * (dGj - dGi)))` between each pair of connected structures,
     /// with `beta = k * T`, where `k` is the Boltzmann constant and `T` the absolute temperature.
     /// The output is in COO format (`(r, i, j)`) and should work nicely with [`scipy.sparse.coo_matrix()`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.coo_matrix.html#scipy.sparse.coo_matrix).
-    /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
+    /// The indices correspond to the order of [`fn@iter()`] and the output of `rufft` as well as the python bindings.
     ///
     /// Try `beta = 0.61`.
     #[allow(non_snake_case)]
@@ -181,7 +181,7 @@ impl RafftGraph {
     /// Return the directed edges `(i, j)` of the fast folding graph, where `i`, `j` are
     /// the indices of the participating structures.
     /// This is the sparse COO format with empty weights.
-    /// The indices correspond to the order of [`iter()`] and the output of `rufft` as well as the python bindings.
+    /// The indices correspond to the order of [`fn@iter()`] and the output of `rufft` as well as the python bindings.
     pub fn adjacent_indices(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         self.inner
             .raw_edges()

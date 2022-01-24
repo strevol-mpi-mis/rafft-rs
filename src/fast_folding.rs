@@ -1,4 +1,4 @@
-//! This module provides `RafftConfig`, a convenient wrapper type to construct [`RafftGraph`]s.
+//! This module provides `RafftConfig`, a convenient wrapper type to construct [`crate::folding_graph::RafftGraph`]s.
 //! Note that energy parameters and temperature are set globally (available via CLI, crate root and python bindings)
 
 use crate::encoding::{BasePairWeights, EncodedSequence};
