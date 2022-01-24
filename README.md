@@ -70,3 +70,12 @@ trmatrix = coo_matrix((rates, (i_s, j_s))).toarray() # or .tocsr()
 # see also
 #ffgraph.directed_edges()
 ```
+
+Note that this implementation does not store duplicate structures in the fast-folding graph.
+This saves a intermediate processing step where duplicate structures need to be removed 
+before any kinetic analysis is pursued.
+
+This does not affect the structures being discovered which should correspond to the paper/python prototype,
+apart from their output order
+However, this might change in a future release as it would allow to discover a few more distinct structures
+at no asymptotical complexity increase.

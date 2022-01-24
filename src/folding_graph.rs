@@ -241,7 +241,7 @@ impl RafftGraph {
 
         // parent, sub_nodes, structure, energy
         let mut new_children: Vec<(NodeIndex, Vec<EncodedSequence>, PairTable, i32)> =
-            Vec::with_capacity(self.number_of_branches);
+            Vec::with_capacity(self.number_of_branches + nodes.len());
 
         for (structure_id, node_children) in nodes.iter().zip(all_children.iter()) {
             for combined_helix in node_children
@@ -282,13 +282,36 @@ impl RafftGraph {
             }
         }
 
+        // The reference implementation carries _all_ the best structures till the end
+        // Therefore we're adding the previous nodes to the new children
+        for structure_id in nodes {
+            new_children.push((
+                *structure_id,
+                self.inner[*structure_id].sub_nodes.clone(), //vec![],
+                self.inner[*structure_id].structure.clone(),
+                self.inner[*structure_id].energy,
+            ));
+        }
+
         // sort by energy
         new_children.sort_by_key(|child| child.3);
         new_children = new_children[..self.saved_trajectories.min(new_children.len())].to_vec();
 
         let new_nodes: Vec<NodeIndex> = new_children
             .into_iter()
-            .map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+            //.map(|(parent, sub_nodes, pt, energy)| self.insert(parent, sub_nodes, pt, energy))
+            .filter_map(|(parent, sub_nodes, pt, energy)| {
+                let id = self.insert(parent, sub_nodes, pt, energy);
+
+                // We added the previous nodes to new_children.
+                // However, to save some work, we only want to return "real" new children
+                // This .filter_map() does this
+                if id == parent {
+                    None
+                } else {
+                    Some(id)
+                }
+            })
             .collect();
 
         if !new_nodes.is_empty() {
