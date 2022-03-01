@@ -72,10 +72,13 @@ trmatrix = coo_matrix((rates, (i_s, j_s))).toarray() # or .tocsr()
 ```
 
 Note that this implementation does not store duplicate structures in the fast-folding graph.
-This saves a intermediate processing step where duplicate structures need to be removed 
+This saves an intermediate processing step where duplicate structures need to be removed 
 before any kinetic analysis is pursued.
 
-This does not affect the structures being discovered which should correspond to the paper/python prototype,
-apart from their output order
+This does not affect the (unique) structures being discovered.
 However, this might change in a future release as it would allow to discover a few more distinct structures
 at no asymptotical complexity increase.
+
+A commandline flag `--compat`/`-c` is available to display redundant structures of the fast-folding graph.
+Use this flag to generate output that can be used with the existing scripts of 
+[RAFFT](https://github.com/strevol-mpi-mis/RAFFT) to produce kinetics.

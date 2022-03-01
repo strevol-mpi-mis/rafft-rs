@@ -1,8 +1,10 @@
+use itertools::Itertools;
 use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 use rafft::fast_folding::RafftConfig;
+use rafft::folding_graph::RafftNodeInfo;
 use rafft::{set_global_energy_parameters, set_global_temperature, VIENNA_VERSION};
 
 #[derive(StructOpt, Debug)]
@@ -51,7 +53,7 @@ struct Opt {
     #[structopt(
         long = "positional-lags",
         short = "l",
-        help = "Minimum amount of unpaired positions enclosed by a hairpin loop",
+        help = "Number of positional lags to search for possible stems",
         default_value = "100"
     )]
     positional_lags: usize,
@@ -75,6 +77,12 @@ struct Opt {
         help = "Format output suitable for internal benchmarks"
     )]
     benchmark: bool,
+    #[structopt(
+        long = "compat",
+        short = "c",
+        help = "Use an output format compatible to the kinetics scripts of RAFFT. This includes duplicate structures."
+    )]
+    compat: bool,
     #[structopt(
         parse(from_os_str),
         long = "output-edges",
@@ -109,14 +117,45 @@ fn main() {
     ffgraph.construct_trajectories();
 
     if !opt.benchmark {
-        ffgraph.iter().for_each(|node| {
-            println!(
-                "[{}] {} {:.2}",
-                node.depth,
-                node.structure.to_string(),
-                node.energy as f64 * 0.01
-            );
-        });
+        if !opt.compat {
+            ffgraph.iter().for_each(|node| {
+                println!(
+                    "[{}] {} {:.2}",
+                    node.depth,
+                    node.structure.to_string(),
+                    node.energy as f64 * 0.01
+                );
+            });
+        } else {
+            let mut grouped: Vec<(usize, Vec<&RafftNodeInfo>)> = vec![];
+            for (depth, nodes) in &ffgraph.iter().group_by(|node| node.depth) {
+                let mut nodes = nodes.collect::<Vec<_>>();
+
+                if nodes.len() < opt.saved_trajectories {
+                    if let Some(previous) = grouped.last() {
+                        let mut missing_previous =
+                            previous.1[..opt.saved_trajectories - nodes.len()].to_vec();
+
+                        nodes.append(&mut missing_previous);
+                        assert_eq!(nodes.len(), opt.saved_trajectories);
+
+                        nodes.sort_by_key(|node| node.energy);
+                    }
+                }
+                grouped.push((depth, nodes));
+            }
+
+            for (depth, nodes) in grouped {
+                println!("# ---------{}----------", depth);
+                nodes.iter().for_each(|node| {
+                    println!(
+                        "{} {:.2}",
+                        node.structure.to_string(),
+                        node.energy as f64 * 0.01
+                    );
+                });
+            }
+        }
 
         if let Some(outfile) = opt.outfile {
             if let Ok(mut file) = std::fs::File::create(&outfile) {
