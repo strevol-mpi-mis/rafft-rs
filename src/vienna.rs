@@ -11,7 +11,6 @@ use std::path::PathBuf;
 /// A wrapper struct around `vrna_fold_compound_t` from ViennaRNA with limited functionality,
 pub struct VCompound {
     fc: *mut vrna_fold_compound_t,
-    length: usize,
 }
 
 impl VCompound {
@@ -24,16 +23,13 @@ impl VCompound {
             vrna_fold_compound(csequence.as_ptr(), md, VRNA_OPTION_EVAL_ONLY)
         };
 
-        Self {
-            fc,
-            length: sequence.len(),
-        }
+        Self { fc }
     }
 
     /// Compute the minimum free energy of an RNA secondary structure provided as a pair table.
     /// Pair tables are 1-indexed and contain the structure's length at position 0.
     pub fn evaluate_structure(&self, pairtable: ArrayView1<i16>) -> i32 {
-        assert_eq!(pairtable.len(), self.length + 1);
+        assert_eq!(pairtable.len(), self.len() + 1);
         unsafe { vrna_eval_structure_pt(self.fc, pairtable.as_ptr()) }
     }
 
@@ -47,7 +43,8 @@ impl VCompound {
     /// Return the length of the underlying sequence of the fold compound.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        self.length
+        // Safety: fc.length is a u32 field in ViennaRNA
+        unsafe { (*self.fc).length as usize }
     }
 }
 
