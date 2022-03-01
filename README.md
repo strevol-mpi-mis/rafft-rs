@@ -37,16 +37,30 @@ In addition, to build the dynamic library `librafft.so` containing `python` bind
 cargo build --release --features bindings
 ```
 
-use `cargo doc --no-deps` to build the documentation.
+Use `cargo doc --no-deps` to build the API documentation.
 
 ## Usage
+
+### CLI
 
 ```sh
 target/release/rufft -h
 ```
 
+#### Example
+
+```sh
+target/release/rufft GGGUUUGCGGUGUAAGUGCAGCCCGUCUUACACCGUGCGGCACAGGCACUAGUACUGAUGUCGUAUACAGGGCUUUUGACAU --saved-trajectories 5 --compat
+```
+
+
+### Python Bindings
+
 ```python
 # It is currently required to have librafft.so in the same directory as your python code
+# Alternatively, make sure that librafft.so is in your python path:
+# import sys
+# sys.path.append("./target/release/")
 from librafft import FastFoldingGraph, set_temperature, set_energy_parameters
 
 # with optional (named or ordered) parameters:
