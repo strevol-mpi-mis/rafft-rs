@@ -1,123 +1,124 @@
+use clap::Parser;
 use itertools::Itertools;
 use std::io::Write;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
 use rafft::fast_folding::RafftConfig;
 use rafft::folding_graph::RafftNodeInfo;
 use rafft::{set_global_energy_parameters, set_global_temperature, VIENNA_VERSION};
 
-#[derive(StructOpt, Debug)]
-#[structopt(
+#[derive(Parser, Debug)]
+#[clap(
     name = "rufft",
-    about = "RAFFT implemented in Rust. RNA structure and folding dynamics prediction using fast Fourier transform.",
+    version,
+    about = "RAFFT implemented in Rust. RNA structure and folding dynamics prediction using fast Fourier transform (https://github.com/strevol-mpi-mis/rafft-rs).",
     after_help(VIENNA_VERSION)
 )]
-struct Opt {
-    #[structopt(
+struct Args {
+    #[clap(
         parse(from_os_str),
         long = "params",
-        short = "P",
+        short = 'P',
         help = "RNA secondary structure energy parameters."
     )]
     parameters: Option<PathBuf>,
-    #[structopt(help = "input RNA sequence")]
+    #[clap(help = "input RNA sequence")]
     sequence: String,
-    #[structopt(long = "AU", help = "Weight of AU base pairs", default_value = "2.0")]
+    #[clap(long = "AU", help = "Weight of AU base pairs", default_value = "2.0")]
     au: f64,
-    #[structopt(long = "GC", help = "Weight of GC base pairs", default_value = "3.0")]
+    #[clap(long = "GC", help = "Weight of GC base pairs", default_value = "3.0")]
     gc: f64,
-    #[structopt(long = "GU", help = "Weight of GU base pairs", default_value = "1.0")]
+    #[clap(long = "GU", help = "Weight of GU base pairs", default_value = "1.0")]
     gu: f64,
-    #[structopt(
+    #[clap(
         long = "temperature",
-        short = "T",
+        short = 'T',
         help = "Temperature in °C, passed to ViennaRNA",
         default_value = "37.0"
     )]
     temperature: f64,
-    #[structopt(
+    #[clap(
         long = "min-unpaired",
-        short = "u",
+        short = 'u',
         help = "Minimum amount of unpaired positions enclosed by a hairpin loop",
         default_value = "3"
     )]
     min_unpaired: usize,
-    #[structopt(
+    #[clap(
         long = "minimum-helix-energy",
-        short = "e",
+        short = 'e',
         help = "Minimum energy [kcal/mol] candidate helix stacks have to contribute; lower (negative) is more stable",
         default_value = "0.0"
     )]
     min_loop_energy: f64,
-    #[structopt(
+    #[clap(
         long = "positional-lags",
-        short = "l",
+        short = 'l',
         help = "Number of positional lags to search for possible stems",
         default_value = "100"
     )]
     positional_lags: usize,
-    #[structopt(
+    #[clap(
         long = "branch",
-        short = "b",
+        short = 'b',
         help = "Number of branches to explore in construction of the fast-folding graph",
         default_value = "1000"
     )]
     number_of_branches: usize,
-    #[structopt(
+    #[clap(
         long = "saved-trajectories",
-        short = "s",
+        short = 's',
         help = "Amount of saved structures per step of the breadth-first search",
         default_value = "1"
     )]
     saved_trajectories: usize,
-    #[structopt(
+    #[clap(
         long = "benchmark",
-        short = "B",
+        short = 'B',
         help = "Format output suitable for internal benchmarks"
     )]
     benchmark: bool,
-    #[structopt(
+    #[clap(
         long = "compat",
-        short = "c",
+        short = 'c',
         help = "Use an output format compatible to the kinetics scripts of RAFFT. This includes duplicate structures."
     )]
     compat: bool,
-    #[structopt(
+    #[clap(
         parse(from_os_str),
         long = "output-edges",
-        short = "o",
+        short = 'o',
         help = "Write edges (pairs of structure indices) to the specified file. The indices correspond to the order of the printed structures."
     )]
     outfile: Option<PathBuf>,
 }
 
 fn main() {
-    let opt = Opt::from_args();
+    let args = Args::parse();
 
-    if let Some(path) = opt.parameters {
+    if let Some(path) = args.parameters {
         set_global_energy_parameters(path);
     }
 
     #[allow(clippy::float_cmp)]
-    if opt.temperature != 37.0 {
-        set_global_temperature(opt.temperature);
+    if args.temperature != 37.0 {
+        set_global_temperature(args.temperature);
     }
 
     let rafft_config = RafftConfig::new()
-        .maximum_trajectories(opt.saved_trajectories)
-        .basepair_weights(opt.au, opt.gc, opt.gu)
-        .minimum_unpaired_in_hairpins(opt.min_unpaired)
-        .minimum_loop_energy(opt.min_loop_energy)
-        .maximum_branches(opt.number_of_branches)
-        .positional_lags(opt.positional_lags);
+        .maximum_trajectories(args.saved_trajectories)
+        .basepair_weights(args.au, args.gc, args.gu)
+        .minimum_unpaired_in_hairpins(args.min_unpaired)
+        .minimum_loop_energy(args.min_loop_energy)
+        .maximum_branches(args.number_of_branches)
+        .positional_lags(args.positional_lags);
 
-    let mut ffgraph = rafft_config.folding_graph(&opt.sequence);
+    let mut ffgraph = rafft_config.folding_graph(&args.sequence);
 
     ffgraph.construct_trajectories();
 
-    if !opt.benchmark {
-        if !opt.compat {
+    if !args.benchmark {
+        if !args.compat {
             ffgraph.iter().for_each(|node| {
                 println!(
                     "[{}] {} {:.2}",
@@ -131,13 +132,13 @@ fn main() {
             for (depth, nodes) in &ffgraph.iter().group_by(|node| node.depth) {
                 let mut nodes = nodes.collect::<Vec<_>>();
 
-                if nodes.len() < opt.saved_trajectories {
+                if nodes.len() < args.saved_trajectories {
                     if let Some(previous) = grouped.last() {
                         let mut missing_previous =
-                            previous.1[..opt.saved_trajectories - nodes.len()].to_vec();
+                            previous.1[..args.saved_trajectories - nodes.len()].to_vec();
 
                         nodes.append(&mut missing_previous);
-                        assert_eq!(nodes.len(), opt.saved_trajectories);
+                        assert_eq!(nodes.len(), args.saved_trajectories);
 
                         nodes.sort_by_key(|node| node.energy);
                     }
@@ -157,7 +158,7 @@ fn main() {
             }
         }
 
-        if let Some(outfile) = opt.outfile {
+        if let Some(outfile) = args.outfile {
             if let Ok(mut file) = std::fs::File::create(&outfile) {
                 ffgraph.adjacent_indices().for_each(|(i, j)| {
                     writeln!(file, "{} {}", i, j).unwrap();
@@ -169,11 +170,11 @@ fn main() {
 
         trajectories.sort_by_key(|node| node.energy);
 
-        for node in &trajectories[..opt.saved_trajectories.min(trajectories.len())] {
+        for node in &trajectories[..args.saved_trajectories.min(trajectories.len())] {
             println!(
                 "{} {} {} {:.1} {}",
-                opt.sequence,
-                opt.sequence.len(),
+                args.sequence,
+                args.sequence.len(),
                 node.structure.to_string(),
                 node.energy as f64 * 0.01,
                 node.structure.pairs()
