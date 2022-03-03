@@ -17,8 +17,8 @@ librna-sys = { version = "0.1" }
 #log = "0.4"
 ndarray = { version = "0.15", features = ["approx"] } # approx feature needed for tests but that can't be enabled separately & automatically yet
 petgraph = "0.6"
-pyo3 = { version = "0.14", features = ["extension-module", "abi3"], optional = true }
-realfft = "2.0"
+pyo3 = { version = "0.16", features = ["extension-module", "abi3"], optional = true }
+realfft = "3.0"
 clap = { version = "3.0", features = ["derive"] }
 thiserror = "1.0"
 
