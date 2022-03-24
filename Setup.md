@@ -13,9 +13,9 @@ If any issues arise following this guide, please [open a new issue](https://gith
 
 ## Installing Rust
 
-Although there is probably a Rust packages for your system, the recommended way of installing Rust
+Although there is probably a Rust package for your system, the recommended way of installing Rust
 is using [`rustup`](https://www.rust-lang.org/tools/install).
-Please follow those instructions to install Rust.
+Please follow those instructions to install Rust if you're unsure about the preferred way for your system.
 
 ## Installing `ViennaRNA`
 
@@ -46,7 +46,7 @@ cd rafft-rs/
 
 Export the following environment variable:
 ```sh
-export CPATH=~/bin/miniconda3/envs/buildrafft/include/
+export CPATH=$CONDA_PREFIX/include/
 ```
 
 Finally, build both the CLI executable `rufft` and the library `librafft.so` containing Python bindings:
@@ -56,7 +56,8 @@ cargo build --features librna-sys/auto,bindings --release
 
 You should be able to locate `rufft` and `librafft.so` in the subdirectory `target/release/`.
 Place them wherever you want.
-To use the Python bindings, place `librafft.so` in the same directory as your Python scripts.
+To use the Python bindings, place `librafft.so` in the same directory as your Python scripts 
+or adjust your `PYTHONPATH` environment variable accordingly.
 
 ## Cleaning up
 

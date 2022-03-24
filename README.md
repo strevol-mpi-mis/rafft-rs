@@ -46,6 +46,68 @@ Use `cargo doc --no-deps` to build the API documentation.
 ```sh
 target/release/rufft -h
 ```
+```sh
+rufft X.Y.Z
+RAFFT implemented in Rust. RNA structure and folding dynamics prediction using fast Fourier
+transform (https://github.com/strevol-mpi-mis/rafft-rs).
+
+USAGE:
+    rufft [OPTIONS] <SEQUENCE>
+
+ARGS:
+    <SEQUENCE>    input RNA sequence
+
+OPTIONS:
+        --AU <AU>
+            Weight of AU base pairs [default: 2.0]
+
+        --GC <GC>
+            Weight of GC base pairs [default: 3.0]
+
+        --GU <GU>
+            Weight of GU base pairs [default: 1.0]
+
+    -b, --branch <NUMBER_OF_BRANCHES>
+            Number of branches to explore in construction of the fast-folding graph [default: 1000]
+
+    -B, --benchmark
+            Format output suitable for internal benchmarks
+
+    -c, --compat
+            Use an output format compatible to the kinetics scripts of RAFFT. This includes
+            duplicate structures.
+
+    -e, --minimum-helix-energy <MIN_LOOP_ENERGY>
+            Minimum energy [kcal/mol] candidate helix stacks have to contribute; lower (negative) is
+            more stable [default: 0.0]
+
+    -h, --help
+            Print help information
+
+    -l, --positional-lags <POSITIONAL_LAGS>
+            Number of positional lags to search for possible stems [default: 100]
+
+    -o, --output-edges <OUTFILE>
+            Write edges (pairs of structure indices) to the specified file. The indices correspond
+            to the order of the printed structures.
+
+    -P, --params <PARAMETERS>
+            RNA secondary structure energy parameters.
+
+    -s, --saved-trajectories <SAVED_TRAJECTORIES>
+            Amount of saved structures per step of the breadth-first search [default: 1]
+
+    -T, --temperature <TEMPERATURE>
+            Temperature in °C, passed to ViennaRNA [default: 37.0]
+
+    -u, --min-unpaired <MIN_UNPAIRED>
+            Minimum amount of unpaired positions enclosed by a hairpin loop [default: 3]
+
+    -V, --version
+            Print version information
+
+U.V.W
+```
 
 #### Example
 
