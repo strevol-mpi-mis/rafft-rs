@@ -40,7 +40,21 @@ fn convolution(a: &[f64], b: &[f64]) -> Array1<f64> {
     let ifft = planner.plan_fft_inverse(length);
     let mut out_ab = ifft.make_output_vec();
 
-    ifft.process(&mut in_ab, &mut out_ab).unwrap();
+    // For some sequences (like GUGCCUUGCGCCGGGAAACCACGCAAGGGGCGUAUGGCGCGCCGAUGAAGGUGUAGA)
+    // the forward real-to-complex FFT produces non-zero imaginary parts in the first vector component.
+    // This error appears to originate in rustfft or realfft.
+    // However, the non-zero imaginary parts seem to be very small (i.e. approximately zero).
+    // Therefore, we consider this to be non-critical and proceed with the computation.
+    //
+    // Nevertheless, we still want to report on these for now, might be relevent at some point.
+    // This should probably be reported using the `log` crate but the warnings can be piped away using
+    // `2> /dev/null` on the commandline.
+    //
+    // See also https://github.com/HEnquist/realfft/issues/11
+    match ifft.process(&mut in_ab, &mut out_ab) {
+        Ok(()) => (),
+        Err(error) => eprintln!("[autocorrelation.rs] INFO: {}", error),
+    }
 
     Array1::from_vec(out_ab)
 }
